@@ -60,6 +60,36 @@ services:
     volumes:
       - phoenix_data:/mnt/data
 
+  daemon:
+    build:
+      context: .
+      dockerfile: docker/daemon.Dockerfile
+    container_name: assistant-daemon
+    restart: unless-stopped
+    depends_on:
+      - litellm
+      - phoenix
+      - sandbox
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_VIRTUAL_KEY: ${LITELLM_VIRTUAL_KEY}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-assistant-main}
+      ASSISTANT_FAST_MODEL: ${ASSISTANT_FAST_MODEL:-assistant-fast}
+      ASSISTANT_EMBED_MODEL: ${ASSISTANT_EMBED_MODEL:-assistant-embed}
+      PHOENIX_OTLP_ENDPOINT: http://phoenix:6006/v1/traces
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_CHAT_ID: ${TELEGRAM_ALLOWED_CHAT_ID}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      EXTERNAL_ICS_URL: ${EXTERNAL_ICS_URL:-workspace/itmo.ics}
+      CALENDAR_TIMEZONE: ${CALENDAR_TIMEZONE:-Europe/Moscow}
+    volumes:
+      - ./data:/app/data
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   litellm_pg_data:
   phoenix_data:

@@ -120,7 +120,22 @@ class AgentLoop:
                         self.context.last_prompt_tokens = int(usage["prompt_tokens"])
 
                     choice = response["choices"][0]
-                    assistant_msg = choice["message"]
+                    raw_msg = choice["message"]
+                    assistant_msg: dict[str, Any] = {"role": "assistant"}
+                    content = raw_msg.get("content")
+                    tool_calls = raw_msg.get("tool_calls") or []
+
+                    # Для Gemini: при tool_calls пустой content должен быть None, а не ""
+                    if content:
+                        assistant_msg["content"] = content
+                    elif not tool_calls:
+                        assistant_msg["content"] = ""
+
+                    if tool_calls:
+                        assistant_msg["tool_calls"] = tool_calls
+                    if raw_msg.get("provider_specific_fields"):
+                        assistant_msg["provider_specific_fields"] = raw_msg["provider_specific_fields"]
+
                     self.messages.append(assistant_msg)
 
                     tool_calls = assistant_msg.get("tool_calls") or []

@@ -2,7 +2,7 @@ model_list:
   # Основная модель для агента и tool calling
   - model_name: assistant-main
     litellm_params:
-      model: gemini/gemini-2.5-flash
+      model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
       timeout: 20
       rpm: 30
@@ -15,13 +15,12 @@ model_list:
       timeout: 15
       rpm: 60
 
-  - model_name: assistant-deep
+  - model_name: assistant-backup
     litellm_params:
-      model: gemini/gemini-4-hydrogen
+      model: gemini/gemini-2.5-flash-lite
       api_key: os.environ/GEMINI_API_KEY
-      reasoning_effort: "low"
-      timeout: 45
-      rpm: 15
+      timeout: 20
+      rpm: 30
 
   - model_name: assistant-embed
     litellm_params:
@@ -32,7 +31,7 @@ model_list:
 router_settings:
   routing_strategy: simple-shuffle
   fallbacks:
-    - { "assistant-main": [ "assistant-fast" ] }
+    - { "assistant-main": [ "assistant-fast", "assistant-backup" ] }
 
 litellm_settings:
   drop_params: true

@@ -118,6 +118,8 @@ if __name__ == "__main__":
 
     try:
         print("Ответ 1:", agent.run_turn("Который сейчас час и сколько будет 37 * 43?"))
+        print("Ответ 2:", agent.run_turn("Запомни, что мой любимый язык — Python, а работаю я на macOS."))
+        print("Ответ 3:", agent.run_turn("Умножь 128 на 256 и напомни, какой у меня любимый язык."))
         print("Сообщений в истории:", len(agent.messages), "| Токенов:", ctx.current_token_count(agent.messages))
     finally:
         gateway.close()

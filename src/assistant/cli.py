@@ -29,6 +29,7 @@ COMMANDS: list[tuple[str, str, bool]] = [
     ("/session", "Переключить сессию (по умолчанию main)", True),
     ("/help", "Список доступных команд", False),
     ("/exit", "Выйти из CLI", False),
+    ("/reset", "Очистить историю текущей сессии (память фактов сохранится)", False),
 ]
 
 
@@ -222,6 +223,10 @@ def main() -> None:
 
             if user_text == "/compact":
                 console.print(client.post(f"/compact/{session_id}").json())
+                continue
+
+            if user_text == "/reset":
+                console.print(client.post(f"/reset/{session_id}").json())
                 continue
 
             if user_text.startswith("/session "):

@@ -282,6 +282,16 @@ def build_dispatcher(
     async def cmd_id(message: Message) -> None:
         await message.answer(f"Ваш chat_id: {message.chat.id}")
 
+    @router.message(Command("reset"))
+    async def cmd_reset(message: Message) -> None:
+        ok, err = _is_authorized(message)
+        if not ok:
+            await message.answer(err or "Доступ запрещён.")
+            return
+        sid = get_session(message.chat.id)
+        rt.memory.clear_session(sid)
+        await message.answer(f"История сессии '{sid}' очищена (долговременная память сохранена).")
+
     @router.message(Command("session"))
     async def cmd_session(message: Message) -> None:
         ok, err = _is_authorized(message)

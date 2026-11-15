@@ -23,6 +23,7 @@ from assistant.tools import ToolRegistry
 from assistant.integrations.marketplace_tools import register_marketplace_tools
 from assistant.integrations.weather_tools import register_weather_tools
 from assistant.integrations.pdf_tools import register_pdf_tools
+from assistant.integrations.gitlab_tools import register_gitlab_tools
 
 
 class AssistantRuntime:
@@ -57,6 +58,7 @@ class AssistantRuntime:
         register_marketplace_tools(self.registry)
         register_weather_tools(self.registry)
         register_pdf_tools(self.registry)
+        register_gitlab_tools(self.registry)
 
         self.registry.register(
             name="get_current_time",
@@ -81,7 +83,7 @@ class AssistantRuntime:
             "- Долговременная память (memory_save / memory_search): сохраняй важные факты и предпочтения.\n"
             "- Файловая система workspace (list_directory, read_file, write_file, edit_file).\n"
             "- Изолированная Docker-песочница (run_shell для bash/pwsh, run_python, get_system_info).\n"
-            "- MCP-инструменты, поиск в интернете (web_search, fetch_webpage), GitHub API.\n"
+            "- MCP-инструменты, поиск в интернете (web_search, fetch_webpage), GitHub API и GitLab Т-Академии (gitlab_*).\n"
             "- Личный календарь, внешний календарь .ics и напоминания.\n"
             "Перед планированием дат или расписания проверяй текущее время через get_current_time."
         )

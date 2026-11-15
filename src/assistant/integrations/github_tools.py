@@ -218,6 +218,63 @@ class GitHubClient:
             "url": res["content"]["html_url"],
         }
 
+    def list_my_repos(self, query: str = "", limit: int = 20) -> list[dict[str, Any]]:
+        self._require_token()
+        repos = self._request(
+            "GET",
+            "/user/repos",
+            params={
+                "sort": "updated",
+                "per_page": 50,
+                "affiliation": "owner,collaborator,organization_member",
+            },
+        )
+        q = query.strip().lower()
+        if q:
+            repos = [
+                r
+                for r in repos
+                if q in r["full_name"].lower()
+                   or q in (r.get("description") or "").lower()
+            ]
+        return [
+            {
+                "full_name": r["full_name"],
+                "private": r["private"],
+                "default_branch": r["default_branch"],
+                "updated_at": r["updated_at"],
+                "url": r["html_url"],
+            }
+            for r in repos[: max(1, min(30, limit))]
+        ]
+
+    def list_pull_requests(
+            self,
+            owner: str,
+            repo: str,
+            state: str = "open",
+            limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        prs = self._request(
+            "GET",
+            f"/repos/{owner}/{repo}/pulls",
+            params={"state": state, "per_page": max(1, min(20, limit))},
+        )
+        return [
+            {
+                "number": pr["number"],
+                "title": pr["title"],
+                "state": pr["state"],
+                "draft": pr.get("draft", False),
+                "head": pr["head"]["ref"],
+                "base": pr["base"]["ref"],
+                "merged_at": pr.get("merged_at"),
+                "author": pr["user"]["login"],
+                "url": pr["html_url"],
+            }
+            for pr in prs
+        ]
+
     def create_pull_request(
             self,
             owner: str,
@@ -426,4 +483,37 @@ def register_github_tools(
             "required": ["owner", "repo", "title"],
         },
         handler=client.create_issue,
+    )
+
+    registry.register(
+        name="github_list_my_repos",
+        description=(
+            "Показывает личные, закрытые и доступные пользовательские репозитории на GitHub "
+            "(по текущему GITHUB_TOKEN). Всегда используй этот инструмент, когда пользователь спрашивает про СВОЙ репозиторий."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Фильтр по названию (опционально, например 'xv6')."},
+                "limit": {"type": "integer", "description": "Сколько репозиториев вернуть (по умолчанию 20)."},
+            },
+            "required": [],
+        },
+        handler=client.list_my_repos,
+    )
+
+    registry.register(
+        name="github_list_pull_requests",
+        description="Показывает Pull Requests (ветки head/base, статус, merged) в GitHub-репозитории.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "owner": {"type": "string"},
+                "repo": {"type": "string"},
+                "state": {"type": "string", "enum": ["open", "closed", "all"]},
+                "limit": {"type": "integer"},
+            },
+            "required": ["owner", "repo"],
+        },
+        handler=client.list_pull_requests,
     )

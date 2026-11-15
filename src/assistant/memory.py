@@ -49,9 +49,9 @@ def _sanitize_fts_query(query: str) -> str:
 
 class MemoryStore:
     def __init__(
-        self,
-        db_path: str | Path,
-        gateway: LLMGatewayClient,
+            self,
+            db_path: str | Path,
+            gateway: LLMGatewayClient,
     ) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,31 +70,34 @@ class MemoryStore:
         with self._connect() as conn:
             conn.executescript(
                 """
-                CREATE TABLE IF NOT EXISTS sessions (
+                CREATE TABLE IF NOT EXISTS sessions
+                (
                     session_id TEXT PRIMARY KEY,
-                    summary TEXT NOT NULL DEFAULT '',
+                    summary    TEXT NOT NULL DEFAULT '',
                     updated_at TEXT NOT NULL
                 );
 
-                CREATE TABLE IF NOT EXISTS session_messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CREATE TABLE IF NOT EXISTS session_messages
+                (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
-                    msg_json TEXT NOT NULL,
+                    msg_json   TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+                    FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_session_messages_sid
-                    ON session_messages(session_id, id);
+                    ON session_messages (session_id, id);
 
-                CREATE TABLE IF NOT EXISTS memories (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    content TEXT NOT NULL,
-                    category TEXT NOT NULL DEFAULT 'fact',
-                    tags TEXT NOT NULL DEFAULT '',
+                CREATE TABLE IF NOT EXISTS memories
+                (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content    TEXT    NOT NULL,
+                    category   TEXT    NOT NULL DEFAULT 'fact',
+                    tags       TEXT    NOT NULL DEFAULT '',
                     importance INTEGER NOT NULL DEFAULT 3,
-                    embedding BLOB NOT NULL,
-                    created_at TEXT NOT NULL
+                    embedding  BLOB    NOT NULL,
+                    created_at TEXT    NOT NULL
                 );
                 """
             )
@@ -135,10 +138,10 @@ class MemoryStore:
         return summary, messages
 
     def save_session_state(
-        self,
-        session_id: str,
-        summary: str,
-        non_system_messages: list[dict[str, Any]],
+            self,
+            session_id: str,
+            summary: str,
+            non_system_messages: list[dict[str, Any]],
     ) -> None:
         self.ensure_session(session_id)
         now = _utc_now()
@@ -162,11 +165,11 @@ class MemoryStore:
     # --- Долговременная память (векторный поиск + FTS5) ---
 
     def save_memory(
-        self,
-        content: str,
-        category: str = "fact",
-        tags: str = "",
-        importance: int = 3,
+            self,
+            content: str,
+            category: str = "fact",
+            tags: str = "",
+            importance: int = 3,
     ) -> dict[str, Any]:
         clean_content = content.strip()
         if not clean_content:
@@ -203,10 +206,10 @@ class MemoryStore:
         return {"status": "saved", "id": mem_id, "category": category, "importance": importance}
 
     def search_memory(
-        self,
-        query: str,
-        category: str | None = None,
-        limit: int = 5,
+            self,
+            query: str,
+            category: str | None = None,
+            limit: int = 5,
     ) -> list[dict[str, Any]]:
         query_vec = self.gateway.create_embedding(query)
 
@@ -281,6 +284,12 @@ class MemoryStore:
                 )
             conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         return {"status": "deleted", "id": memory_id}
+
+    def clear_session(self, session_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
+            conn.execute("UPDATE sessions SET summary = '', updated_at = ? WHERE session_id = ?",
+                         (_utc_now(), session_id))
 
 
 def register_memory_tools(registry: ToolRegistry, memory: MemoryStore) -> None:

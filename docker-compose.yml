@@ -84,6 +84,9 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       EXTERNAL_ICS_URL: ${EXTERNAL_ICS_URL:-workspace/itmo.ics}
       CALENDAR_TIMEZONE: ${CALENDAR_TIMEZONE:-Europe/Moscow}
+      GITLAB_URL: ${GITLAB_URL:-https://gitlab.education.tbank.ru}
+      GITLAB_TOKEN: ${GITLAB_TOKEN}
+      GITLAB_SSL_VERIFY: ${GITLAB_SSL_VERIFY:-false}
     volumes:
       - ./data:/app/data
       - ./workspace:/app/workspace

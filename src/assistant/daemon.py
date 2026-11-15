@@ -208,6 +208,14 @@ def stats() -> dict[str, Any]:
     return _rt().spend_tracker.summary()
 
 
+@app.post("/reset/{session_id}")
+async def reset_session(session_id: str) -> dict[str, str]:
+    rt = _rt()
+    async with _runtime_lock:
+        await asyncio.to_thread(rt.memory.clear_session, session_id)
+    return {"status": "ok", "session_id": session_id}
+
+
 if __name__ == "__main__":
     import os
     host = os.getenv("HOST", "0.0.0.0")

@@ -13,5 +13,12 @@ class Settings:
     fast_model: str = os.getenv("ASSISTANT_FAST_MODEL", "assistant-fast")
     embed_model: str = os.getenv("ASSISTANT_EMBED_MODEL", "assistant-embed")
 
+    otel_enabled: bool = os.getenv("OTEL_ENABLED", "true").lower() == "true"
+    phoenix_endpoint: str = os.getenv(
+        "PHOENIX_OTLP_ENDPOINT", "http://127.0.0.1:6006/v1/traces"
+    )
+    service_name: str = os.getenv("OTEL_SERVICE_NAME", "personal-assistant")
+    log_file: str = os.getenv("ASSISTANT_LOG_FILE", "logs/assistant.jsonl")
+
 
 settings = Settings()

@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import time
+from assistant.observability import get_tracer, log_event
+
 from assistant.config import settings
 from assistant.context import ContextManager
 from assistant.gateway import LLMGatewayClient
@@ -84,57 +87,91 @@ class AgentLoop:
         )
 
     def run_turn(self, user_input: str) -> str:
-        self._inject_relevant_memories(user_input)
-        self.messages.append({"role": "user", "content": user_input})
+        tracer = get_tracer()
+        t0 = time.perf_counter()
 
-        if self.context.needs_compaction(self.messages):
-            print("[compaction] Контекст превысил порог — сжимаем историю...")
-            self.messages = self.context.compact(self.messages)
+        with tracer.start_as_current_span("agent.turn") as turn_span:
+            turn_span.set_attribute("openinference.span.kind", "AGENT")
+            turn_span.set_attribute("session.id", self.session_id)
+            turn_span.set_attribute("input.value", user_input)
 
-        schemas = self.tools.schemas() or None
+            log_event("agent.turn_start", session_id=self.session_id, user_input=user_input[:200])
 
-        try:
-            for step in range(1, self.max_steps + 1):
-                response = self.gateway.chat_completion(
-                    model=self.model,
-                    messages=self.messages,
-                    tools=schemas,
-                )
+            self._inject_relevant_memories(user_input)
+            self.messages.append({"role": "user", "content": user_input})
 
-                usage = response.get("usage") or {}
-                if "prompt_tokens" in usage:
-                    self.context.last_prompt_tokens = int(usage["prompt_tokens"])
+            if self.context.needs_compaction(self.messages):
+                log_event("agent.compaction", session_id=self.session_id, trigger="pre_turn")
+                self.messages = self.context.compact(self.messages)
 
-                choice = response["choices"][0]
-                assistant_msg = choice["message"]
-                self.messages.append(assistant_msg)
+            schemas = self.tools.schemas() or None
+            final_answer = "Достигнут лимит шагов агента без финального ответа."
 
-                tool_calls = assistant_msg.get("tool_calls") or []
-                if not tool_calls:
-                    return (assistant_msg.get("content") or "").strip()
-
-                for tc in tool_calls:
-                    fn = tc["function"]
-                    tool_name = fn["name"]
-                    raw_args = fn.get("arguments", "{}")
-                    print(f"  [step {step}] -> tool: {tool_name}({raw_args})")
-
-                    result = self.tools.execute(tool_name, raw_args)
-                    print(f"  [step {step}] <- result: {result[:150]}")
-
-                    self.messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tc["id"],
-                            "name": tool_name,
-                            "content": result,
-                        }
+            try:
+                for step in range(1, self.max_steps + 1):
+                    response = self.gateway.chat_completion(
+                        model=self.model,
+                        messages=self.messages,
+                        tools=schemas,
                     )
 
-                if self.context.needs_compaction(self.messages):
-                    print("[compaction] Сжатие истории внутри цикла агента...")
-                    self.messages = self.context.compact(self.messages)
+                    usage = response.get("usage") or {}
+                    if "prompt_tokens" in usage:
+                        self.context.last_prompt_tokens = int(usage["prompt_tokens"])
 
-            return "Достигнут лимит шагов агента без финального ответа."
-        finally:
-            self._persist_session()
+                    choice = response["choices"][0]
+                    assistant_msg = choice["message"]
+                    self.messages.append(assistant_msg)
+
+                    tool_calls = assistant_msg.get("tool_calls") or []
+                    if not tool_calls:
+                        final_answer = (assistant_msg.get("content") or "").strip()
+                        break
+
+                    for tc in tool_calls:
+                        fn = tc["function"]
+                        tool_name = fn["name"]
+                        raw_args = fn.get("arguments", "{}")
+                        print(f"  [step {step}] -> tool: {tool_name}({raw_args})")
+
+                        with tracer.start_as_current_span(f"tool.{tool_name}") as tool_span:
+                            tool_span.set_attribute("openinference.span.kind", "TOOL")
+                            tool_span.set_attribute("tool.name", tool_name)
+                            tool_span.set_attribute("input.value", str(raw_args)[:1000])
+
+                            t_tool = time.perf_counter()
+                            result = self.tools.execute(tool_name, raw_args)
+                            tool_ms = int((time.perf_counter() - t_tool) * 1000)
+
+                            tool_span.set_attribute("output.value", result[:1000])
+                            log_event(
+                                "agent.tool_call",
+                                session_id=self.session_id,
+                                step=step,
+                                tool=tool_name,
+                                duration_ms=tool_ms,
+                            )
+
+                        print(f"  [step {step}] <- result: {result[:150]}")
+                        self.messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc["id"],
+                                "name": tool_name,
+                                "content": result,
+                            }
+                        )
+
+                    if self.context.needs_compaction(self.messages):
+                        log_event("agent.compaction", session_id=self.session_id, trigger="in_loop")
+                        self.messages = self.context.compact(self.messages)
+
+                turn_span.set_attribute("output.value", final_answer[:2000])
+                log_event(
+                    "agent.turn_end",
+                    session_id=self.session_id,
+                    duration_ms=int((time.perf_counter() - t0) * 1000),
+                )
+                return final_answer
+            finally:
+                self._persist_session()

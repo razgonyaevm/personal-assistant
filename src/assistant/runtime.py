@@ -21,6 +21,7 @@ from assistant.standards import build_standards_prompt, discover_skills, registe
 from assistant.task_queue import TaskQueue, register_queue_tools
 from assistant.tools import ToolRegistry
 from assistant.integrations.marketplace_tools import register_marketplace_tools
+from assistant.integrations.weather_tools import register_weather_tools
 
 
 class AssistantRuntime:
@@ -53,6 +54,7 @@ class AssistantRuntime:
         register_calendar_tools(self.registry, self.calendar)
         register_reminder_tools(self.registry, self.reminders)
         register_marketplace_tools(self.registry)
+        register_weather_tools(self.registry)
 
         self.registry.register(
             name="get_current_time",

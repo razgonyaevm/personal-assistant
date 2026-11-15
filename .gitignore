@@ -8,3 +8,4 @@ data/
 workspace/notes/
 workspace/fib.txt
 logs/
+workspace/*.ics

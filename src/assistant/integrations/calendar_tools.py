@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sqlite3
 from typing import Any
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import httpx
 import icalendar
@@ -16,6 +17,9 @@ load_dotenv()
 
 
 def _local_tz():
+    tz_name = os.getenv("CALENDAR_TIMEZONE", "").strip()
+    if tz_name:
+        return ZoneInfo(tz_name)
     return datetime.now().astimezone().tzinfo
 
 
@@ -107,7 +111,7 @@ class CalendarManager:
             start_date: str | None = None,
             end_date: str | None = None,
     ) -> list[dict[str, Any]]:
-        now = datetime.now().astimezone()
+        now = datetime.now(_local_tz())
         start_dt = (
             _parse_dt(start_date)
             if start_date
@@ -152,10 +156,15 @@ class CalendarManager:
                 resp.raise_for_status()
                 raw_ics = resp.content
         else:
-            raw_ics = Path(ics_source).read_bytes()
+            p = Path(ics_source)
+            if not p.exists() and not p.is_absolute():
+                in_ws = Path(os.getenv("ASSISTANT_WORKSPACE_DIR", "workspace")) / ics_source
+                if in_ws.exists():
+                    p = in_ws
+            raw_ics = p.read_bytes()
 
         cal = icalendar.Calendar.from_ical(raw_ics)
-        start = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+        start = datetime.now(_local_tz()).replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=max(1, min(60, int(days_ahead))))
 
         events = recurring_ical_events.of(cal).between(start, end)
@@ -224,13 +233,13 @@ def register_calendar_tools(registry: ToolRegistry, cal: CalendarManager) -> Non
     registry.register(
         name="calendar_external_events",
         description=(
-            "Читает события из внешнего календаря .ics (URL или локальный файл — "
-            "например расписание ВУЗа или матчей)."
+            "Читает события из внешнего календаря .ics (расписание ВУЗа/матчей). "
+            "Если source не передан — автоматически использует внешний календарь из настроек."
         ),
         parameters={
             "type": "object",
             "properties": {
-                "source": {"type": "string", "description": "URL или путь к .ics (опционально)."},
+                "source": {"type": "string", "description": "Опционально: URL или имя файла .ics."},
                 "days_ahead": {"type": "integer", "description": "На сколько дней вперёд (по умолчанию 7)."},
             },
             "required": [],

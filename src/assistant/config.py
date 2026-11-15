@@ -11,6 +11,7 @@ class Settings:
     litellm_api_key: str = os.getenv("LITELLM_VIRTUAL_KEY", "")
     default_model: str = os.getenv("ASSISTANT_MODEL", "assistant-main")
     fast_model: str = os.getenv("ASSISTANT_FAST_MODEL", "assistant-fast")
+    embed_model: str = os.getenv("ASSISTANT_EMBED_MODEL", "assistant-embed")
 
 
 settings = Settings()

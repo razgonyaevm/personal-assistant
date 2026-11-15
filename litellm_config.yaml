@@ -23,6 +23,12 @@ model_list:
       timeout: 45
       rpm: 15
 
+  - model_name: assistant-embed
+    litellm_params:
+      model: gemini/gemini-embedding-001
+      api_key: os.environ/GEMINI_API_KEY
+      timeout: 20
+
 router_settings:
   routing_strategy: simple-shuffle
   fallbacks:

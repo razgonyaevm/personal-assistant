@@ -54,6 +54,23 @@ class LLMGatewayClient:
             )
         return response.json()
 
+    def create_embedding(
+            self,
+            text: str,
+            model: str | None = None,
+    ) -> list[float]:
+        payload = {
+            "model": model or settings.embed_model,
+            "input": text,
+        }
+        response = self._client.post("/v1/embeddings", json=payload)
+        if response.status_code >= 400:
+            raise GatewayError(
+                f"LiteLLM embeddings вернул {response.status_code}: {response.text}"
+            )
+        data = response.json()
+        return data["data"][0]["embedding"]
+
     def close(self) -> None:
         self._client.close()
 

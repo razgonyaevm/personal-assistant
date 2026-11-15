@@ -209,4 +209,6 @@ def stats() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    uvicorn.run("assistant.daemon:app", host="127.0.0.1", port=8080, reload=False)
+    import os
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run("assistant.daemon:app", host=host, port=8080, reload=False)

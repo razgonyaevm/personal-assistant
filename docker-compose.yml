@@ -10,7 +10,7 @@ services:
     volumes:
       - litellm_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      test: [ "CMD-SHELL", "pg_isready -U litellm -d litellm" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,7 +31,21 @@ services:
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?set in .env}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?set in .env}
       DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@db:5432/litellm
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    command: [ "--config", "/app/config.yaml", "--port", "4000" ]
+
+  sandbox:
+    build:
+      context: .
+      dockerfile: docker/sandbox.Dockerfile
+    container_name: assistant-sandbox
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - ./workspace:/workspace
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   litellm_pg_data:

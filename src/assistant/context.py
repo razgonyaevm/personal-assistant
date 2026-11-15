@@ -43,11 +43,11 @@ class ContextManager:
 
     def _find_safe_split_index(self, non_system: list[dict[str, Any]]) -> int:
         """
-        Выбирает индекс разделения на 'старую' и 'недавнюю' историю так,
-        чтобы не отрезать сообщение 'tool' от его родительского 'assistant(tool_calls)'.
+        Выбирает индекс разделения так, чтобы недавняя история всегда
+        начиналась с сообщения 'user' (и не разрывала tool_calls / tool).
         """
         split_idx = max(0, len(non_system) - self.keep_recent_messages)
-        while split_idx > 0 and non_system[split_idx].get("role") == "tool":
+        while split_idx > 0 and non_system[split_idx].get("role") != "user":
             split_idx -= 1
         return split_idx
 

@@ -48,7 +48,7 @@ class AgentLoop:
                         "content": f"[Сжатый контекст предыдущего диалога]\n{saved_summary}",
                     }
                 )
-            self.messages.extend(saved_msgs)
+            self.messages.extend(self._sanitize_history(saved_msgs))
 
     def _inject_relevant_memories(self, user_input: str) -> None:
         if self.memory_store is None:
@@ -76,6 +76,18 @@ class AgentLoop:
                 },
             )
 
+    def _sanitize_history(self, msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        cleaned = list(msgs)
+        # Начало истории всегда должно быть с user
+        while cleaned and cleaned[0].get("role") != "user":
+            cleaned.pop(0)
+        # Если прошлый ход оборвался на user / tool / незакрытом tool_calls — откатываем хвост
+        while cleaned and (
+                cleaned[-1].get("role") != "assistant" or cleaned[-1].get("tool_calls")
+        ):
+            cleaned.pop()
+        return cleaned
+
     def _persist_session(self) -> None:
         if self.memory_store is None:
             return
@@ -97,6 +109,7 @@ class AgentLoop:
 
             log_event("agent.turn_start", session_id=self.session_id, user_input=user_input[:200])
 
+            snapshot = list(self.messages)
             self._inject_relevant_memories(user_input)
             self.messages.append({"role": "user", "content": user_input})
 
@@ -188,5 +201,8 @@ class AgentLoop:
                     duration_ms=int((time.perf_counter() - t0) * 1000),
                 )
                 return final_answer
+            except Exception:
+                self.messages = snapshot
+                raise
             finally:
                 self._persist_session()

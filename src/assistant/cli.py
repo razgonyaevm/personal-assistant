@@ -98,7 +98,10 @@ def print_banner(session_id: str, tools_count: int) -> None:
 
 
 def show_notifications(client: httpx.Client) -> None:
-    notes = client.get("/notifications/cli").json()
+    try:
+        notes = client.get("/notifications/cli").json()
+    except Exception:
+        return
     for n in notes:
         console.print(
             Panel(n["text"], title=f"Уведомление ({n['source']})", border_style="yellow")

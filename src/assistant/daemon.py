@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import suppress
+from assistant.telegram_bot import start_telegram_services
+
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,6 +29,20 @@ class TaskRequest(BaseModel):
 runtime: AssistantRuntime | None = None
 _waiters: dict[int, asyncio.Future[str]] = {}
 _runtime_lock = asyncio.Lock()
+
+
+async def enqueue_chat_and_wait(session_id: str, message: str, channel: str) -> str:
+    rt = _rt()
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[str] = loop.create_future()
+    task_id = rt.queue.enqueue(
+        prompt=message,
+        session_id=session_id,
+        channel=channel,
+        kind="chat",
+    )
+    _waiters[task_id] = fut
+    return await fut
 
 
 async def _task_worker(rt: AssistantRuntime) -> None:
@@ -96,15 +113,24 @@ async def lifespan(_: FastAPI):
     runtime = AssistantRuntime()
     worker_task = asyncio.create_task(_task_worker(runtime))
     reminder_task = asyncio.create_task(_reminder_loop(runtime))
+    tg_bundle = await start_telegram_services(runtime, enqueue_chat_and_wait, compact_session)
     try:
         yield
     finally:
+        if tg_bundle is not None:
+            bot, dp, tg_tasks = tg_bundle
+            with suppress(Exception):
+                await dp.stop_polling()
+            for t in tg_tasks:
+                t.cancel()
+                with suppress(asyncio.CancelledError):
+                    await t
+            await bot.session.close()
+
         for t in (worker_task, reminder_task):
             t.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await t
-            except asyncio.CancelledError:
-                pass
         runtime.close()
 
 
@@ -125,18 +151,8 @@ def health() -> dict[str, Any]:
 
 @app.post("/chat")
 async def chat(req: ChatRequest) -> dict[str, Any]:
-    rt = _rt()
-    loop = asyncio.get_running_loop()
-    fut: asyncio.Future[str] = loop.create_future()
-    task_id = rt.queue.enqueue(
-        prompt=req.message,
-        session_id=req.session_id,
-        channel=req.channel,
-        kind="chat",
-    )
-    _waiters[task_id] = fut
-    reply = await fut
-    return {"task_id": task_id, "session_id": req.session_id, "reply": reply}
+    reply = await enqueue_chat_and_wait(req.session_id, req.message, req.channel)
+    return {"session_id": req.session_id, "reply": reply}
 
 
 @app.post("/tasks")

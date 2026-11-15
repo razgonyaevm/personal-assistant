@@ -28,6 +28,12 @@ model_list:
       api_key: os.environ/GEMINI_API_KEY
       timeout: 20
 
+  - model_name: assistant-transcribe
+    litellm_params:
+      model: gemini/gemini-3.5-transcribe
+      api_key: os.environ/GEMINI_API_KEY
+      timeout: 30
+
 router_settings:
   routing_strategy: simple-shuffle
   fallbacks:

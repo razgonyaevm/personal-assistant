@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import html
 import re
+import io
 
 import asyncio
 from contextlib import suppress
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -184,6 +186,97 @@ def build_dispatcher(
             "/session <имя> — переключить сессию (по умолчанию main)\n"
             "/id — показать chat_id"
         )
+
+    @router.message(F.document)
+    async def handle_document(message: Message) -> None:
+        ok, err = _is_authorized(message)
+        if not ok:
+            await message.answer(err or "Доступ запрещён.")
+            return
+
+        doc = message.document
+        if not doc or not doc.file_name:
+            return
+
+        file_name = Path(doc.file_name).name
+        target_path = rt.workspace_dir / file_name
+
+        stop_event = asyncio.Event()
+        typing_task = asyncio.create_task(_keep_typing(message.bot, message.chat.id, stop_event))
+        try:
+            # 1. Скачиваем файл в workspace
+            await message.bot.download(doc.file_id, destination=target_path)
+
+            caption = (message.caption or "").strip()
+            if caption:
+                # Чёткий запрос пользователя: отвечаем СТРОГО на него
+                prompt = (
+                    f"Файл '{file_name}' сохранён в workspace.\n"
+                    f"Запрос пользователя: \"{caption}\"\n"
+                    f"Инструкция: Ответь строго и точно на поставленный вопрос по этому файлу, "
+                    f"не делай лишних выжимок и пересказов, если об этом прямо не просили."
+                )
+            else:
+                # Если файл отправлен без текста: просто смотрим инфо и ждём указаний
+                prompt = (
+                    f"Файл '{file_name}' успешно сохранён в workspace. "
+                    f"Посмотри базовую информацию (pdf_info) и просто подтверди получение: "
+                    f"назови количество страниц и спроси, какую задачу выполнить."
+                )
+
+            sid = get_session(message.chat.id)
+            reply = await run_chat(sid, prompt, "telegram")
+            await _send_chunked(message, reply)
+        except Exception as exc:
+            await message.answer(f"Ошибка при сохранении/обработке документа: {exc}")
+        finally:
+            stop_event.set()
+            with suppress(asyncio.CancelledError):
+                await typing_task
+
+    @router.message(F.voice | F.audio)
+    async def handle_voice_or_audio(message: Message) -> None:
+        ok, err = _is_authorized(message)
+        if not ok:
+            await message.answer(err or "Доступ запрещён.")
+            return
+
+        audio_obj = message.voice or message.audio
+        if not audio_obj:
+            return
+
+        filename = "voice.ogg" if message.voice else (message.audio.file_name or "audio.mp3")
+
+        stop_event = asyncio.Event()
+        typing_task = asyncio.create_task(_keep_typing(message.bot, message.chat.id, stop_event))
+        try:
+            voice_buf = io.BytesIO()
+            await message.bot.download(audio_obj.file_id, destination=voice_buf)
+            audio_bytes = voice_buf.getvalue()
+
+            sid = get_session(message.chat.id)
+            transcribed_text = await asyncio.to_thread(
+                rt.gateway.transcribe_audio,
+                audio_bytes,
+                filename,
+            )
+            clean_text = (transcribed_text or "").strip()
+            if not clean_text:
+                await message.answer("Не удалось разобрать слова в аудиосообщении.")
+                return
+
+            # Показываем распознанный текст
+            await message.answer(f"🗣️ <i>«{html.escape(clean_text)}»</i>", parse_mode="HTML")
+
+            # Передаём распознанный текст в цикл агента
+            reply = await run_chat(sid, clean_text, "telegram")
+            await _send_chunked(message, reply)
+        except Exception as exc:
+            await message.answer(f"Ошибка при обработке голосового сообщения: {exc}")
+        finally:
+            stop_event.set()
+            with suppress(asyncio.CancelledError):
+                await typing_task
 
     @router.message(Command("id"))
     async def cmd_id(message: Message) -> None:

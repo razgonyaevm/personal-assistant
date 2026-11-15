@@ -35,7 +35,6 @@ class LLMGatewayClient:
             base_url=self.base_url,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
             },
             timeout=timeout,
         )
@@ -190,6 +189,78 @@ class LLMGatewayClient:
                 )
 
             return data["data"][0]["embedding"]
+
+    def transcribe_audio(
+            self,
+            file_bytes: bytes,
+            filename: str = "voice.ogg",
+            model: str | None = None,
+    ) -> str:
+        used_model = model or "assistant-transcribe"
+        mime = "audio/ogg" if filename.endswith((".ogg", ".oga")) else "audio/mpeg"
+        files = {
+            "file": (filename, file_bytes, mime),
+        }
+        data = {
+            "model": used_model,
+        }
+
+        tracer = get_tracer()
+        t0 = time.perf_counter()
+        with tracer.start_as_current_span("llm.transcription") as span:
+            span.set_attribute("openinference.span.kind", "LLM")
+            span.set_attribute("llm.model_name", used_model)
+            span.set_attribute("audio.bytes", len(file_bytes))
+
+            response = self._client.post(
+                "/v1/audio/transcriptions",
+                data=data,
+                files=files,
+            )
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+
+            if response.status_code >= 400:
+                span.set_attribute("error", True)
+                log_event(
+                    "llm.transcribe_error",
+                    level="ERROR",
+                    model=used_model,
+                    status_code=response.status_code,
+                    detail=response.text[:500],
+                )
+                raise GatewayError(
+                    f"LiteLLM audio/transcriptions вернул {response.status_code}: {response.text}"
+                )
+
+            res_data = response.json()
+            text = (res_data.get("text") or "").strip()
+            span.set_attribute("output.value", text[:1000])
+
+            cost_usd = self._extract_cost(response)
+            log_event(
+                "llm.transcription",
+                model=used_model,
+                channel=self.channel,
+                session_id=self.session_id,
+                cost_usd=cost_usd,
+                latency_ms=latency_ms,
+            )
+
+            if self.spend_tracker is not None:
+                approx_tokens = max(1, len(text.split()))
+                self.spend_tracker.record(
+                    model=used_model,
+                    operation="transcription",
+                    prompt_tokens=0,
+                    completion_tokens=approx_tokens,
+                    total_tokens=approx_tokens,
+                    cost_usd=cost_usd,
+                    latency_ms=latency_ms,
+                    channel=self.channel,
+                    session_id=self.session_id,
+                )
+
+            return text
 
     def close(self) -> None:
         self._client.close()

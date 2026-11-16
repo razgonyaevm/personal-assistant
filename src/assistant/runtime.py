@@ -24,6 +24,7 @@ from assistant.integrations.marketplace_tools import register_marketplace_tools
 from assistant.integrations.weather_tools import register_weather_tools
 from assistant.integrations.pdf_tools import register_pdf_tools
 from assistant.integrations.gitlab_tools import register_gitlab_tools
+from assistant.integrations.email_tools import register_email_tools
 
 
 class AssistantRuntime:
@@ -59,6 +60,7 @@ class AssistantRuntime:
         register_weather_tools(self.registry)
         register_pdf_tools(self.registry)
         register_gitlab_tools(self.registry)
+        register_email_tools(self.registry)
 
         self.registry.register(
             name="get_current_time",
@@ -85,6 +87,7 @@ class AssistantRuntime:
             "- Изолированная Docker-песочница (run_shell для bash/pwsh, run_python, get_system_info).\n"
             "- MCP-инструменты, поиск в интернете (web_search, fetch_webpage), GitHub API и GitLab Т-Академии (gitlab_*).\n"
             "- Личный календарь, внешний календарь .ics и напоминания.\n"
+            "- Почта Gmail (email_*): просмотр, чтение, вложения, перенос в корзину, отправка после подтверждения.\n"
             "Перед планированием дат или расписания проверяй текущее время через get_current_time."
         )
         return f"{base}\n\n{standards}" if standards else base

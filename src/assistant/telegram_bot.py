@@ -4,6 +4,11 @@ import html
 import re
 import io
 
+import base64
+from datetime import datetime
+from pathlib import Path
+from assistant.integrations.vision_tools import IMAGE_EXTENSIONS, guess_mime_type
+
 import asyncio
 from contextlib import suppress
 from pathlib import Path
@@ -159,7 +164,7 @@ async def _notification_loop(bot: Bot, rt: AssistantRuntime) -> None:
 
 def build_dispatcher(
         rt: AssistantRuntime,
-        run_chat: Callable[[str, str, str], Awaitable[str]],
+        run_chat: Callable[..., Awaitable[str]],
         compact_fn: Callable[[str], Awaitable[dict[str, Any]]],
 ) -> Dispatcher:
     router = Router()
@@ -188,6 +193,65 @@ def build_dispatcher(
             "/id — показать chat_id"
         )
 
+    async def _process_image_message(
+            message: Message,
+            file_id: str,
+            file_name: str,
+    ) -> None:
+        uploads_dir = rt.workspace_dir / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        target_path = uploads_dir / file_name
+
+        stop_event = asyncio.Event()
+        typing_task = asyncio.create_task(_keep_typing(message.bot, message.chat.id, stop_event))
+        try:
+            await message.bot.download(file_id, destination=target_path)
+            img_bytes = target_path.read_bytes()
+            b64 = base64.b64encode(img_bytes).decode("ascii")
+            mime = guess_mime_type(target_path)
+
+            caption = (message.caption or "").strip()
+            if caption:
+                prompt = (
+                    f"[Пользователь прислал изображение, сохранено в uploads/{file_name}]\n"
+                    f"Запрос пользователя: \"{caption}\"\n"
+                    f"Инструкция: Внимательно изучи изображение (распознай текст, формулы, код или схему) "
+                    f"и выполни именно то, что попросил пользователь."
+                )
+            else:
+                prompt = (
+                    f"[Пользователь прислал изображение, сохранено в uploads/{file_name}]\n"
+                    f"Распознай текст/содержимое на изображении. Если на фото задача, уравнение или код с ошибкой — "
+                    f"реши или объясни; если документ/слайд — сделай чёткую расшифровку."
+                )
+
+            sid = get_session(message.chat.id)
+            reply = await run_chat(
+                sid,
+                prompt,
+                "telegram",
+                images=[{"mime_type": mime, "data_b64": b64}],
+            )
+            await _send_chunked(message, reply)
+        except Exception as exc:
+            await message.answer(f"Ошибка при обработке изображения: {exc}")
+        finally:
+            stop_event.set()
+            with suppress(asyncio.CancelledError):
+                await typing_task
+
+    @router.message(F.photo)
+    async def handle_photo(message: Message) -> None:
+        ok, err = _is_authorized(message)
+        if not ok:
+            await message.answer(err or "Доступ запрещён.")
+            return
+        if not message.photo:
+            return
+        largest = message.photo[-1]
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        await _process_image_message(message, largest.file_id, f"photo_{ts}.jpg")
+
     @router.message(F.document)
     async def handle_document(message: Message) -> None:
         ok, err = _is_authorized(message)
@@ -200,6 +264,11 @@ def build_dispatcher(
             return
 
         file_name = Path(doc.file_name).name
+
+        if Path(file_name).suffix.lower() in IMAGE_EXTENSIONS:
+            await _process_image_message(message, doc.file_id, file_name)
+            return
+
         target_path = rt.workspace_dir / file_name
 
         stop_event = asyncio.Event()

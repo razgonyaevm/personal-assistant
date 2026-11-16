@@ -28,10 +28,16 @@ class TaskRequest(BaseModel):
 
 runtime: AssistantRuntime | None = None
 _waiters: dict[int, asyncio.Future[str]] = {}
+_task_images: dict[int, list[dict[str, str]]] = {}
 _runtime_lock = asyncio.Lock()
 
 
-async def enqueue_chat_and_wait(session_id: str, message: str, channel: str) -> str:
+async def enqueue_chat_and_wait(
+        session_id: str,
+        message: str,
+        channel: str,
+        images: list[dict[str, str]] | None = None,
+) -> str:
     rt = _rt()
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[str] = loop.create_future()
@@ -41,6 +47,8 @@ async def enqueue_chat_and_wait(session_id: str, message: str, channel: str) -> 
         channel=channel,
         kind="chat",
     )
+    if images:
+        _task_images[task_id] = images
     _waiters[task_id] = fut
     return await fut
 
@@ -60,9 +68,11 @@ async def _task_worker(rt: AssistantRuntime) -> None:
         kind = task["kind"]
         prompt = task["prompt"]
 
+        images = _task_images.pop(task_id, None)
+
         try:
             async with _runtime_lock:
-                answer = await asyncio.to_thread(rt.run_turn, session_id, prompt, channel)
+                answer = await asyncio.to_thread(rt.run_turn, session_id, prompt, channel, images)
             rt.queue.complete(task_id, answer)
             log_event("queue.task_done", task_id=task_id, session_id=session_id, channel=channel)
 
@@ -218,5 +228,6 @@ async def reset_session(session_id: str) -> dict[str, str]:
 
 if __name__ == "__main__":
     import os
+
     host = os.getenv("HOST", "0.0.0.0")
     uvicorn.run("assistant.daemon:app", host=host, port=8080, reload=False)

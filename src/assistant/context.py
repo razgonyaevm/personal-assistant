@@ -8,12 +8,25 @@ from assistant.gateway import LLMGatewayClient
 
 
 def estimate_tokens(messages: list[dict[str, Any]]) -> int:
-    """Грубая оценка токенов (на случай, если ещё не было ответа от шлюза)."""
+    """Грубая оценка токенов (без раздувания на base64-картинках и thought_signatures)."""
     total_chars = 0
+    image_tokens = 0
     for msg in messages:
-        total_chars += len(json.dumps(msg, ensure_ascii=False, default=str))
-    # ~3.5 символа на токен для смешанного RU/EN текста и JSON
-    return max(1, int(total_chars / 3.5))
+        content = msg.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    image_tokens += 300
+                else:
+                    total_chars += len(json.dumps(part, ensure_ascii=False, default=str))
+        else:
+            slim = {
+                k: v
+                for k, v in msg.items()
+                if k not in ("provider_specific_fields", "thinking_blocks", "images")
+            }
+            total_chars += len(json.dumps(slim, ensure_ascii=False, default=str))
+    return max(1, int(total_chars / 3.5) + image_tokens)
 
 
 class ContextManager:

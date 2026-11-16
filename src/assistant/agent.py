@@ -13,6 +13,25 @@ from assistant.memory import MemoryStore
 from assistant.tools import ToolRegistry
 
 
+def _strip_images_for_storage(msg: dict[str, Any]) -> dict[str, Any]:
+    content = msg.get("content")
+    if not isinstance(content, list):
+        return msg
+    text_parts: list[str] = []
+    img_count = 0
+    for part in content:
+        if isinstance(part, dict) and part.get("type") == "text":
+            text_parts.append(str(part.get("text", "")))
+        elif isinstance(part, dict) and part.get("type") == "image_url":
+            img_count += 1
+    clean_text = "\n".join(p for p in text_parts if p).strip()
+    if img_count and "[Пользователь прислал изображение" not in clean_text:
+        clean_text = f"[Прикреплено изображений: {img_count}]\n{clean_text}".strip()
+    copied = dict(msg)
+    copied["content"] = clean_text
+    return copied
+
+
 class AgentLoop:
     def __init__(
             self,
@@ -91,14 +110,22 @@ class AgentLoop:
     def _persist_session(self) -> None:
         if self.memory_store is None:
             return
-        non_system = [m for m in self.messages if m.get("role") != "system"]
+        non_system = [
+            _strip_images_for_storage(m)
+            for m in self.messages
+            if m.get("role") != "system"
+        ]
         self.memory_store.save_session_state(
             session_id=self.session_id,
             summary=self.context.summary,
             non_system_messages=non_system,
         )
 
-    def run_turn(self, user_input: str) -> str:
+    def run_turn(
+            self,
+            user_input: str,
+            images: list[dict[str, str]] | None = None,
+    ) -> str:
         tracer = get_tracer()
         t0 = time.perf_counter()
 
@@ -111,7 +138,20 @@ class AgentLoop:
 
             snapshot = list(self.messages)
             self._inject_relevant_memories(user_input)
-            self.messages.append({"role": "user", "content": user_input})
+            if images:
+                parts: list[dict[str, Any]] = [{"type": "text", "text": user_input}]
+                for img in images:
+                    parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{img['mime_type']};base64,{img['data_b64']}"
+                            },
+                        }
+                    )
+                self.messages.append({"role": "user", "content": parts})
+            else:
+                self.messages.append({"role": "user", "content": user_input})
 
             if self.context.needs_compaction(self.messages):
                 log_event("agent.compaction", session_id=self.session_id, trigger="pre_turn")

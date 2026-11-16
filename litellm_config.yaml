@@ -1,26 +1,49 @@
 model_list:
-  # Основная модель для агента и tool calling
+  # Пул основных быстрых моделей (LiteLLM сам балансирует и обходит 429)
+  - model_name: assistant-main
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+      reasoning_effort: "low"
+      timeout: 25
+      rpm: 30
+
   - model_name: assistant-main
     litellm_params:
       model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
-      timeout: 20
+      reasoning_effort: "low"
+      timeout: 25
       rpm: 30
 
-  # Быстрая/дешёвая модель для compaction и fallback
+  - model_name: assistant-main
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+      timeout: 25
+      rpm: 30
+
+  # Резервная цепочка лёгких моделей
   - model_name: assistant-fast
     litellm_params:
-      model: gemini/gemini-3.5-flash-lite
+      model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
-      timeout: 15
+      timeout: 20
       rpm: 60
 
   - model_name: assistant-backup
     litellm_params:
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+      timeout: 20
+      rpm: 60
+
+  - model_name: assistant-reserve
+    litellm_params:
       model: gemini/gemini-2.5-flash-lite
       api_key: os.environ/GEMINI_API_KEY
       timeout: 20
-      rpm: 30
+      rpm: 60
 
   - model_name: assistant-embed
     litellm_params:
@@ -36,12 +59,14 @@ model_list:
 
 router_settings:
   routing_strategy: simple-shuffle
+  allowed_fails: 1
+  cooldown_time: 300
   fallbacks:
-    - { "assistant-main": [ "assistant-fast", "assistant-backup" ] }
+    - { "assistant-main": [ "assistant-fast", "assistant-backup", "assistant-reserve" ] }
 
 litellm_settings:
   drop_params: true
-  num_retries: 1
+  num_retries: 2
   request_timeout: 25
 
 general_settings:

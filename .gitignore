@@ -11,3 +11,4 @@ logs/
 workspace/*.ics
 workspace/README.md
 workspace/*.pdf
+workspace/uploads/

@@ -25,6 +25,7 @@ from assistant.integrations.weather_tools import register_weather_tools
 from assistant.integrations.pdf_tools import register_pdf_tools
 from assistant.integrations.gitlab_tools import register_gitlab_tools
 from assistant.integrations.email_tools import register_email_tools
+from assistant.integrations.vision_tools import register_vision_tools
 
 
 class AssistantRuntime:
@@ -61,6 +62,7 @@ class AssistantRuntime:
         register_pdf_tools(self.registry)
         register_gitlab_tools(self.registry)
         register_email_tools(self.registry)
+        register_vision_tools(self.registry, self.gateway)
 
         self.registry.register(
             name="get_current_time",
@@ -92,7 +94,13 @@ class AssistantRuntime:
         )
         return f"{base}\n\n{standards}" if standards else base
 
-    def run_turn(self, session_id: str, user_input: str, channel: str) -> str:
+    def run_turn(
+            self,
+            session_id: str,
+            user_input: str,
+            channel: str,
+            images: list[dict[str, str]] | None = None,
+    ) -> str:
         self.gateway.channel = channel
         self.gateway.session_id = session_id
 
@@ -105,7 +113,7 @@ class AssistantRuntime:
             memory_store=self.memory,
             session_id=session_id,
         )
-        return agent.run_turn(user_input)
+        return agent.run_turn(user_input, images=images)
 
     def compact_session(self, session_id: str) -> dict[str, Any]:
         summary, msgs = self.memory.load_session(session_id)

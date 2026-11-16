@@ -155,7 +155,7 @@ def main() -> None:
         completer=SlashCommandCompleter(),
         complete_while_typing=True,
         complete_style=CompleteStyle.COLUMN,
-        reserve_space_for_menu=6,
+        reserve_space_for_menu=10,
         key_bindings=_build_key_bindings(),
         style=CLI_STYLE,
     )

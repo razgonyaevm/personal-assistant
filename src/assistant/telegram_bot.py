@@ -184,6 +184,7 @@ def build_dispatcher(
             "/stats — расход токенов и USD\n"
             "/compact — сжать контекст сессии\n"
             "/session <имя> — переключить сессию (по умолчанию main)\n"
+            "/reset — очистить историю текущей сессии\n"
             "/id — показать chat_id"
         )
 
@@ -433,6 +434,7 @@ async def start_telegram_services(
             BotCommand(command="history", description="История общей сессии"),
             BotCommand(command="stats", description="Расход токенов и USD"),
             BotCommand(command="compact", description="Сжать контекст"),
+            BotCommand(command="reset", description="Очистить историю текущей сессии"),
             BotCommand(command="session", description="Переключить сессию"),
         ]
     )

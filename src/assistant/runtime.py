@@ -26,6 +26,7 @@ from assistant.integrations.pdf_tools import register_pdf_tools
 from assistant.integrations.gitlab_tools import register_gitlab_tools
 from assistant.integrations.email_tools import register_email_tools
 from assistant.integrations.vision_tools import register_vision_tools
+from assistant.integrations.expense_tools import register_expense_tools, ExpenseTracker
 
 
 class AssistantRuntime:
@@ -34,6 +35,8 @@ class AssistantRuntime:
 
         self.db_path = Path(settings.db_path)
         self.workspace_dir = Path(settings.workspace_dir).resolve()
+
+        self.expenses = ExpenseTracker(self.db_path)
 
         self.spend_tracker = SpendTracker(self.db_path)
         self.gateway = LLMGatewayClient(spend_tracker=self.spend_tracker)
@@ -63,6 +66,7 @@ class AssistantRuntime:
         register_gitlab_tools(self.registry)
         register_email_tools(self.registry)
         register_vision_tools(self.registry, self.gateway)
+        register_expense_tools(self.registry, self.expenses)
 
         self.registry.register(
             name="get_current_time",

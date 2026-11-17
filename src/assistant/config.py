@@ -12,6 +12,7 @@ class Settings:
     default_model: str = os.getenv("ASSISTANT_MODEL", "assistant-main")
     fast_model: str = os.getenv("ASSISTANT_FAST_MODEL", "assistant-fast")
     embed_model: str = os.getenv("ASSISTANT_EMBED_MODEL", "assistant-embed")
+    web_app_url: str = os.getenv("TELEGRAM_WEBAPP_URL", "")
 
     otel_enabled: bool = os.getenv("OTEL_ENABLED", "true").lower() == "true"
     phoenix_endpoint: str = os.getenv(

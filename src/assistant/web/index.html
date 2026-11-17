@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <title>Personal Assistant</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: var(--tg-theme-bg-color, #0f172a);
+            --card: var(--tg-theme-secondary-bg-color, #1e293b);
+            --text: var(--tg-theme-text-color, #f1f5f9);
+            --hint: var(--tg-theme-hint-color, #94a3b8);
+            --accent: var(--tg-theme-button-color, #38bdf8);
+            --accent-text: var(--tg-theme-button-text-color, #0f172a);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .card {
+            background-color: var(--card);
+        }
+
+        .hint {
+            color: var(--hint);
+        }
+
+        .btn-accent {
+            background-color: var(--accent);
+            color: var(--accent-text);
+        }
+
+        .tab-active {
+            border-bottom: 2px solid var(--accent);
+            color: var(--text);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Шапка -->
+<header class="card px-4 py-3 flex items-center justify-between border-b border-white/10 sticky top-0 z-20">
+    <div>
+        <h1 class="text-base font-bold leading-tight">Personal Assistant</h1>
+        <p id="sub-status" class="text-xs hint">Загрузка...</p>
+    </div>
+    <button onclick="refreshActiveTab()" class="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">
+        ↻ Обновить
+    </button>
+</header>
+
+<!-- Навигация (3 вкладки без лишнего чата) -->
+<nav class="card flex justify-around text-xs sm:text-sm border-b border-white/10 sticky top-[57px] z-10">
+    <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="py-2.5 px-4 tab-active">📅 Планы и погода
+    </button>
+    <button onclick="switchTab('expenses')" id="tab-btn-expenses" class="py-2.5 px-4 hint">💰 Расходы</button>
+    <button onclick="switchTab('system')" id="tab-btn-system" class="py-2.5 px-4 hint">⚙️ Система</button>
+</nav>
+
+<!-- Контент -->
+<main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-4 space-y-4">
+
+    <!-- Вкладка 1: Погода + Расписание по дням + Напоминания -->
+    <section id="tab-schedule" class="space-y-4">
+
+        <!-- Виджет погоды -->
+        <div class="card p-4 rounded-2xl border border-white/10 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <div class="text-xs hint uppercase tracking-wider">Погода сейчас</div>
+                    <div class="flex items-baseline gap-2 mt-0.5">
+                        <span id="w-city" class="text-lg font-bold">Санкт-Петербург</span>
+                        <span id="w-temp" class="text-2xl font-extrabold text-sky-400">—°</span>
+                    </div>
+                    <div id="w-desc" class="text-xs sm:text-sm mt-0.5">Загружаем прогноз...</div>
+                </div>
+
+                <form onsubmit="changeCity(event)" class="flex gap-1.5 items-center">
+                    <input id="w-city-input" type="text" placeholder="Другой город..."
+                           class="w-32 sm:w-40 bg-black/20 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs outline-none"/>
+                    <button type="submit" class="btn-accent px-2.5 py-1.5 rounded-lg text-xs font-semibold">ОК</button>
+                </form>
+            </div>
+
+            <div id="w-details" class="flex flex-wrap gap-3 text-xs hint"></div>
+            <div id="w-strip" class="flex gap-2 overflow-x-auto pb-1 pt-1"></div>
+        </div>
+
+        <!-- Расписание по дням -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h2 class="text-sm font-semibold">🎓 Расписание по дням (7 дней)</h2>
+                <span id="sched-count" class="text-xs hint"></span>
+            </div>
+            <div id="sched-days" class="space-y-3"></div>
+        </div>
+
+        <!-- Напоминания -->
+        <div class="card p-4 rounded-2xl border border-white/10">
+            <h3 class="text-sm font-semibold mb-3">⏰ Активные напоминания</h3>
+            <div id="sched-reminders" class="space-y-2 text-sm"></div>
+        </div>
+    </section>
+
+    <!-- Вкладка 2: Расходы -->
+    <section id="tab-expenses" class="hidden space-y-4">
+        <div class="card p-4 rounded-2xl border border-white/10 flex flex-wrap gap-3 items-center justify-between">
+            <div>
+                <label class="text-xs hint block">Месяц</label>
+                <input id="exp-month" type="month" onchange="loadExpenses()"
+                       class="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm mt-1"/>
+            </div>
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+                <input id="exp-no-transfers" type="checkbox" onchange="loadExpenses()" class="rounded"/>
+                <span>Без переводов с карты / СБП</span>
+            </label>
+            <div class="text-right">
+                <div class="text-xs hint">Итого потрачено</div>
+                <div id="exp-total" class="text-xl font-bold">— ₽</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card p-4 rounded-2xl border border-white/10 flex flex-col items-center">
+                <h3 class="text-sm font-semibold mb-2 self-start">Структура трат</h3>
+                <div class="w-full max-w-[240px]">
+                    <canvas id="exp-chart"></canvas>
+                </div>
+            </div>
+            <div class="card p-4 rounded-2xl border border-white/10">
+                <h3 class="text-sm font-semibold mb-3">По категориям</h3>
+                <div id="exp-categories" class="space-y-2.5 text-sm"></div>
+            </div>
+        </div>
+
+        <div class="card p-4 rounded-2xl border border-white/10">
+            <h3 class="text-sm font-semibold mb-3">Последние операции</h3>
+            <div id="exp-list" class="divide-y divide-white/10 text-xs sm:text-sm"></div>
+        </div>
+    </section>
+
+    <!-- Вкладка 3: Система -->
+    <section id="tab-system" class="hidden space-y-4">
+        <div id="sys-stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+        <div class="card p-4 rounded-2xl border border-white/10">
+            <h3 class="text-sm font-semibold mb-3">📋 Общая очередь задач</h3>
+            <div id="sys-tasks" class="space-y-2 text-xs sm:text-sm"></div>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+        tg.ready();
+        tg.expand();
+    }
+
+    let activeTab = 'schedule';
+    let currentCity = 'Санкт-Петербург';
+    let weatherByDate = {};
+    let expChart = null;
+
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('exp-month').value = defaultMonth;
+
+    const WEEKDAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const SHORT_DAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+    function apiHeaders() {
+        const h = {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': '1',
+        };
+        if (tg && tg.initData) h['X-Telegram-Init-Data'] = tg.initData;
+        const urlToken = new URLSearchParams(window.location.search).get('token');
+        if (urlToken) h['X-Dashboard-Token'] = urlToken;
+        return h;
+    }
+
+    async function apiFetch(url, options = {}) {
+        const res = await fetch(url, {...options, headers: {...apiHeaders(), ...(options.headers || {})}});
+        if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+        return res.json();
+    }
+
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function formatDayLabel(dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((dt - today) / 86400000);
+
+        const base = `${WEEKDAYS[dt.getDay()]}, ${d} ${MONTHS_GEN[m - 1]}`;
+        if (diffDays === 0) return `Сегодня · ${base}`;
+        if (diffDays === 1) return `Завтра · ${base}`;
+        return base;
+    }
+
+    function extractUrl(text) {
+        const m = String(text || '').match(/https?:\/\/[^\s)]+/);
+        return m ? m[0] : null;
+    }
+
+    function switchTab(name) {
+        activeTab = name;
+        for (const t of ['schedule', 'expenses', 'system']) {
+            document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
+            document.getElementById(`tab-btn-${t}`).className =
+                t === name ? 'py-2.5 px-4 tab-active' : 'py-2.5 px-4 hint';
+        }
+        refreshActiveTab();
+    }
+
+    function changeCity(e) {
+        e.preventDefault();
+        const val = document.getElementById('w-city-input').value.trim();
+        if (!val) return;
+        currentCity = val;
+        loadWeatherAndSchedule();
+    }
+
+    async function loadWeather() {
+        try {
+            const w = await apiFetch(`/api/weather?city=${encodeURIComponent(currentCity)}&days=7`);
+            const cur = w.current || {};
+            document.getElementById('w-city').textContent = w.city;
+            document.getElementById('w-temp').textContent = `${Math.round(cur.temperature_c)}°C`;
+            document.getElementById('w-desc').textContent =
+                `${cur.weather_description} · ощущается как ${Math.round(cur.apparent_temperature_c)}°C`;
+            document.getElementById('w-details').innerHTML = `
+          <span>💨 Ветер: ${cur.wind_speed_kmh} км/ч</span>
+          <span>💧 Влажность: ${cur.humidity_pct}%</span>
+          <span>🌧️ Осадки: ${cur.precipitation_mm} мм</span>`;
+
+            weatherByDate = {};
+            const stripHtml = (w.forecast || []).map(day => {
+                weatherByDate[day.date] = day;
+                const [y, m, d] = day.date.split('-').map(Number);
+                const dt = new Date(y, m - 1, d);
+                const icon = (day.weather_description || '').split(' ').pop() || '';
+                return `
+            <div class="min-w-[76px] p-2 rounded-xl bg-black/20 border border-white/5 text-center shrink-0">
+              <div class="text-[11px] hint">${SHORT_DAYS[dt.getDay()]} ${d}</div>
+              <div class="text-base my-0.5">${escapeHtml(icon)}</div>
+              <div class="text-xs font-semibold">${Math.round(day.temp_max_c)}° <span class="hint font-normal">${Math.round(day.temp_min_c)}°</span></div>
+              <div class="text-[10px] text-sky-400">💧${day.precipitation_probability_pct ?? 0}%</div>
+            </div>`;
+            }).join('');
+            document.getElementById('w-strip').innerHTML = stripHtml;
+        } catch (err) {
+            document.getElementById('w-desc').textContent = `Не удалось загрузить погоду (${err.message})`;
+        }
+    }
+
+    async function loadSchedule() {
+        const data = await apiFetch('/api/schedule');
+        const grouped = {};
+        let totalEvents = 0;
+
+        const addEvent = (dateKey, item) => {
+            if (!dateKey) return;
+            if (!grouped[dateKey]) grouped[dateKey] = [];
+            grouped[dateKey].push(item);
+            totalEvents += 1;
+        };
+
+        for (const ev of (data.external || [])) {
+            const dKey = ev.start.slice(0, 10);
+            addEvent(dKey, {
+                kind: 'external',
+                title: ev.summary,
+                startTime: ev.start.slice(11, 16),
+                endTime: ev.end ? ev.end.slice(11, 16) : '',
+                location: ev.location || '',
+                link: extractUrl(ev.description) || extractUrl(ev.location),
+            });
+        }
+
+        for (const ev of (data.personal || [])) {
+            const dKey = ev.start_at.slice(0, 10);
+            addEvent(dKey, {
+                kind: 'personal',
+                title: ev.title,
+                startTime: ev.start_at.slice(11, 16),
+                endTime: ev.end_at ? ev.end_at.slice(11, 16) : '',
+                location: ev.location || '',
+                link: extractUrl(ev.location) || extractUrl(ev.notes),
+            });
+        }
+
+        document.getElementById('sched-count').textContent = `событий: ${totalEvents}`;
+        const sortedDates = Object.keys(grouped).sort();
+        const daysBox = document.getElementById('sched-days');
+
+        if (!sortedDates.length) {
+            daysBox.innerHTML = '<div class="card p-4 rounded-2xl text-sm hint">На ближайшие 7 дней событий не найдено</div>';
+        } else {
+            daysBox.innerHTML = sortedDates.map(dKey => {
+                const items = grouped[dKey].sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const wDay = weatherByDate[dKey];
+                const weatherBadge = wDay
+                    ? `<span class="text-xs px-2 py-0.5 rounded-full bg-white/10 whitespace-nowrap">${escapeHtml((wDay.weather_description || '').split(' ').pop())} ${Math.round(wDay.temp_max_c)}°/${Math.round(wDay.temp_min_c)}°</span>`
+                    : '';
+
+                const rowsHtml = items.map(item => {
+                    const isPersonal = item.kind === 'personal';
+                    const isSport = item.title.toLowerCase().includes('баскетбол') || item.title.toLowerCase().includes('спорт');
+                    const barColor = isPersonal ? 'bg-emerald-400' : (isSport ? 'bg-amber-400' : 'bg-sky-400');
+                    const tag = isPersonal ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Личное</span>' : '';
+                    const linkBtn = item.link
+                        ? `<a href="${escapeHtml(item.link)}" target="_blank" class="inline-block mt-1 text-[11px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">🔗 Подключиться</a>`
+                        : '';
+
+                    return `
+              <div class="flex gap-3 items-stretch py-2 border-t border-white/5 first:border-t-0">
+                <div class="w-12 shrink-0 text-right">
+                  <div class="text-xs font-bold">${escapeHtml(item.startTime)}</div>
+                  <div class="text-[11px] hint">${escapeHtml(item.endTime)}</div>
+                </div>
+                <div class="w-1 rounded-full ${barColor} shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium leading-snug flex flex-wrap items-center gap-1.5">
+                    <span>${escapeHtml(item.title)}</span>${tag}
+                  </div>
+                  ${item.location ? `<div class="text-xs hint mt-0.5">📍 ${escapeHtml(item.location)}</div>` : ''}
+                  ${linkBtn}
+                </div>
+              </div>`;
+                }).join('');
+
+                return `
+            <div class="card p-3.5 rounded-2xl border border-white/10">
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="text-sm font-bold">${escapeHtml(formatDayLabel(dKey))}</div>
+                ${weatherBadge}
+              </div>
+              <div>${rowsHtml}</div>
+            </div>`;
+            }).join('');
+        }
+
+        document.getElementById('sched-reminders').innerHTML = (data.reminders || []).map(r => `
+        <div class="p-2.5 rounded-xl bg-black/20 flex justify-between gap-2 items-center">
+          <div>
+            <div class="font-medium text-sm">${escapeHtml(r.text)}</div>
+            <div class="hint text-xs">${escapeHtml(r.schedule_type)} · след. ${escapeHtml(r.next_run_at.slice(0, 16).replace('T', ' '))}</div>
+          </div>
+        </div>`).join('') || '<div class="hint text-xs">Нет активных напоминаний</div>';
+    }
+
+    async function loadWeatherAndSchedule() {
+        await loadWeather();
+        await loadSchedule();
+    }
+
+    async function loadExpenses() {
+        const month = document.getElementById('exp-month').value || defaultMonth;
+        const excludeTransfers = document.getElementById('exp-no-transfers').checked;
+        const data = await apiFetch(`/api/expenses?month=${encodeURIComponent(month)}&exclude_transfers=${excludeTransfers}`);
+
+        document.getElementById('exp-total').textContent = `${data.total_rub.toLocaleString('ru-RU')} ₽`;
+
+        const catBox = document.getElementById('exp-categories');
+        catBox.innerHTML = data.by_category.length ? '' : '<div class="hint text-xs">Нет расходов за этот месяц</div>';
+        const labels = [], values = [];
+        for (const c of data.by_category) {
+            labels.push(c.category);
+            values.push(c.sum_rub);
+            catBox.innerHTML += `
+          <div>
+            <div class="flex justify-between items-center text-xs sm:text-sm">
+              <span>${escapeHtml(c.category)} <span class="hint text-xs">(${c.count})</span></span>
+              <span class="font-semibold">${c.sum_rub.toLocaleString('ru-RU')} ₽ <span class="hint text-xs">${c.percent}%</span></span>
+            </div>
+            <div class="w-full h-1.5 bg-black/25 rounded-full mt-1 overflow-hidden">
+              <div class="h-full bg-sky-400 rounded-full" style="width:${Math.min(100, c.percent)}%"></div>
+            </div>
+          </div>`;
+        }
+
+        const ctx = document.getElementById('exp-chart').getContext('2d');
+        if (expChart) expChart.destroy();
+        expChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ['#38bdf8', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#60a5fa', '#2dd4bf', '#f97316', '#94a3b8'],
+                    borderWidth: 0
+                }]
+            },
+            options: {plugins: {legend: {display: false}}}
+        });
+
+        document.getElementById('exp-list').innerHTML = data.recent.map(r => `
+        <div class="py-2 flex justify-between gap-2">
+          <div>
+            <div class="font-medium">${escapeHtml(r.category)}</div>
+            <div class="hint text-xs">${escapeHtml(r.tx_date)} · ${escapeHtml(r.description)}</div>
+          </div>
+          <div class="font-semibold whitespace-nowrap">${Number(r.amount).toLocaleString('ru-RU')} ₽</div>
+        </div>`).join('') || '<div class="hint py-2">Пусто</div>';
+    }
+
+    async function loadSystem() {
+        const data = await apiFetch('/api/system');
+        const s = data.stats;
+        document.getElementById('sys-stats').innerHTML = `
+        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Запросов</div><div class="text-lg font-bold">${s.requests}</div></div>
+        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Токенов</div><div class="text-lg font-bold">${s.total_tokens.toLocaleString()}</div></div>
+        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Расход</div><div class="text-lg font-bold">$${s.total_cost_usd}</div></div>
+        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Ср. задержка</div><div class="text-lg font-bold">${s.avg_latency_ms} мс</div></div>`;
+
+        document.getElementById('sys-tasks').innerHTML = (data.tasks || []).map(t => `
+        <div class="p-2.5 rounded-lg bg-black/20 flex justify-between gap-2">
+          <div>
+            <span class="font-semibold">#${t.id}</span> <span class="hint">[${escapeHtml(t.channel)}/${escapeHtml(t.kind)}]</span>
+            <div class="mt-0.5">${escapeHtml(t.prompt.slice(0, 90))}</div>
+          </div>
+          <span class="px-2 py-0.5 h-fit rounded text-xs bg-white/10">${escapeHtml(t.status)}</span>
+        </div>`).join('');
+    }
+
+    async function refreshActiveTab() {
+        try {
+            const h = await fetch('/health', {headers: apiHeaders()}).then(r => r.json());
+            document.getElementById('sub-status').textContent = `Онлайн · ${h.tools} инструментов`;
+        } catch (e) {
+            document.getElementById('sub-status').textContent = `Нет связи`;
+        }
+        if (activeTab === 'schedule') await loadWeatherAndSchedule();
+        if (activeTab === 'expenses') await loadExpenses();
+        if (activeTab === 'system') await loadSystem();
+    }
+
+    refreshActiveTab();
+</script>
+</body>
+</html>

@@ -4,6 +4,8 @@ import html
 import re
 import io
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
+
 import base64
 from datetime import datetime
 from pathlib import Path
@@ -326,6 +328,27 @@ def build_dispatcher(
             with suppress(asyncio.CancelledError):
                 await typing_task
 
+    @router.message(Command("app"))
+    async def cmd_app(message: Message) -> None:
+        ok, err = _is_authorized(message)
+        if not ok:
+            await message.answer(err or "Доступ запрещён.")
+            return
+        url = settings.web_app_url.strip()
+        if not url.startswith("https://"):
+            await message.answer(
+                "TELEGRAM_WEBAPP_URL ещё не задан или не начинается с https://.\n"
+                "Локальный дашборд доступен с Mac по адресу http://127.0.0.1:8080\n"
+                "А для Telegram Mini App запустите туннель: cloudflared tunnel --url http://127.0.0.1:8080"
+            )
+            return
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🚀 Открыть Дашборд", web_app=WebAppInfo(url=url))]
+            ]
+        )
+        await message.answer("Открыть панель управления и аналитики:", reply_markup=kb)
+
     @router.message(F.voice | F.audio)
     async def handle_voice_or_audio(message: Message) -> None:
         ok, err = _is_authorized(message)
@@ -527,8 +550,26 @@ async def start_telegram_services(
             BotCommand(command="compact", description="Сжать контекст"),
             BotCommand(command="reset", description="Очистить историю текущей сессии"),
             BotCommand(command="session", description="Переключить сессию"),
+            BotCommand(command="app", description="Открыть Web-дашборд (Mini App)"),
         ]
     )
+
+    webapp_url = settings.web_app_url.strip()
+    if webapp_url.startswith("https://"):
+        menu_btn = MenuButtonWebApp(
+            text="Дашборд",
+            web_app=WebAppInfo(url=webapp_url),
+        )
+        # Устанавливаем глобально по умолчанию для бота
+        await bot.set_chat_menu_button(menu_button=menu_btn)
+        # И принудительно для вашего личного чата (чтобы обновилось сразу без кэша)
+        allowed = settings.telegram_allowed_chat_id.strip()
+        if allowed:
+            with suppress(Exception):
+                await bot.set_chat_menu_button(
+                    chat_id=int(allowed),
+                    menu_button=menu_btn,
+                )
 
     polling_task = asyncio.create_task(
         dp.start_polling(bot, handle_signals=False)

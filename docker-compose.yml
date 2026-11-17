@@ -93,11 +93,25 @@ services:
       EMAIL_IMAP_PORT: ${EMAIL_IMAP_PORT:-993}
       EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.gmail.com}
       EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
+      TELEGRAM_WEBAPP_URL: ${TELEGRAM_WEBAPP_URL:-}
     volumes:
       - ./data:/app/data
       - ./workspace:/app/workspace
       - ./logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: assistant-ngrok
+    restart: unless-stopped
+    depends_on:
+      - daemon
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:?set in .env}
+    command:
+      - "http"
+      - "http://daemon:8080"
+      - "--url=${TELEGRAM_WEBAPP_URL}"
 
 volumes:
   litellm_pg_data:

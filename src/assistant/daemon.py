@@ -3,10 +3,17 @@ from __future__ import annotations
 from contextlib import suppress
 from assistant.telegram_bot import start_telegram_services
 
+from pathlib import Path
+from fastapi.responses import HTMLResponse
+
+from assistant.web_auth import require_dashboard_auth
+
+from assistant.integrations.weather_tools import get_weather_forecast
+
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import uvicorn
 
@@ -151,6 +158,76 @@ def _rt() -> AssistantRuntime:
     if runtime is None:
         raise HTTPException(status_code=503, detail="Runtime not initialized")
     return runtime
+
+
+INDEX_HTML_PATH = Path(__file__).resolve().parent / "web" / "index.html"
+
+
+@app.get("/", response_class=HTMLResponse)
+def web_dashboard() -> HTMLResponse:
+    return HTMLResponse(INDEX_HTML_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/api/history/{session_id}", dependencies=[Depends(require_dashboard_auth)])
+def api_history(session_id: str, limit: int = 20) -> dict[str, Any]:
+    return get_history(session_id, limit=limit)
+
+
+@app.post("/api/chat", dependencies=[Depends(require_dashboard_auth)])
+async def api_chat(req: ChatRequest) -> dict[str, Any]:
+    return await chat(req)
+
+
+@app.get("/api/expenses", dependencies=[Depends(require_dashboard_auth)])
+def api_expenses(month: str = "", exclude_transfers: bool = False) -> dict[str, Any]:
+    rt = _rt()
+    rows = rt.expenses.list_expenses(month=month or None, limit=200)
+    if exclude_transfers:
+        rows = [
+            r for r in rows
+            if not any(w in r["category"].lower() for w in ("перевод", "внесение"))
+        ]
+
+    total = round(sum(float(r["amount"]) for r in rows), 2)
+    cats: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        cat = r["category"]
+        if cat not in cats:
+            cats[cat] = {"category": cat, "count": 0, "sum_rub": 0.0}
+        cats[cat]["count"] += 1
+        cats[cat]["sum_rub"] = round(cats[cat]["sum_rub"] + float(r["amount"]), 2)
+
+    by_cat = sorted(cats.values(), key=lambda x: x["sum_rub"], reverse=True)
+    for c in by_cat:
+        c["percent"] = round((c["sum_rub"] / total * 100), 1) if total > 0 else 0.0
+
+    return {"month": month, "total_rub": total, "by_category": by_cat, "recent": rows[:25]}
+
+
+@app.get("/api/weather", dependencies=[Depends(require_dashboard_auth)])
+async def api_weather(city: str = "Санкт-Петербург", days: int = 7) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(get_weather_forecast, city, days)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/schedule", dependencies=[Depends(require_dashboard_auth)])
+def api_schedule() -> dict[str, Any]:
+    rt = _rt()
+    try:
+        external = rt.calendar.read_external_events(days_ahead=7)
+    except Exception:
+        external = []
+    personal = rt.calendar.list_personal_events()
+    reminders = rt.reminders.list_reminders()
+    return {"external": external, "personal": personal, "reminders": reminders}
+
+
+@app.get("/api/system", dependencies=[Depends(require_dashboard_auth)])
+def api_system() -> dict[str, Any]:
+    rt = _rt()
+    return {"stats": rt.spend_tracker.summary(), "tasks": rt.queue.list_recent(limit=15)}
 
 
 @app.get("/health")

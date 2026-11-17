@@ -27,6 +27,7 @@ from assistant.integrations.gitlab_tools import register_gitlab_tools
 from assistant.integrations.email_tools import register_email_tools
 from assistant.integrations.vision_tools import register_vision_tools
 from assistant.integrations.expense_tools import register_expense_tools, ExpenseTracker
+from assistant.integrations.todo_tools import TodoManager, register_todo_tools
 
 
 class AssistantRuntime:
@@ -35,6 +36,8 @@ class AssistantRuntime:
 
         self.db_path = Path(settings.db_path)
         self.workspace_dir = Path(settings.workspace_dir).resolve()
+
+        self.todos = TodoManager(self.db_path)
 
         self.expenses = ExpenseTracker(self.db_path)
 
@@ -67,6 +70,7 @@ class AssistantRuntime:
         register_email_tools(self.registry)
         register_vision_tools(self.registry, self.gateway)
         register_expense_tools(self.registry, self.expenses)
+        register_todo_tools(self.registry, self.todos)
 
         self.registry.register(
             name="get_current_time",
@@ -102,7 +106,8 @@ class AssistantRuntime:
             "- GitHub API и GitLab Т-Академии (github_*, gitlab_*).\n"
             "- Почта Gmail (email_*): просмотр, чтение, вложения, перенос в корзину, отправка после подтверждения.\n"
             "- Личный календарь, внешний календарь .ics и напоминания.\n"
-            "- Погода (по умолчанию Санкт-Петербург), маркетплейсы, PDF-анализатор, Vision и учёт расходов."
+            "- Погода (по умолчанию Санкт-Петербург), маркетплейсы, PDF-анализатор, Vision и учёт расходов.\n"
+            "- Личный To-Do список (todo_*): задачи с приоритетами, категориями и дедлайнами.\n"
         )
         return f"{base}\n\n{standards}" if standards else base
 

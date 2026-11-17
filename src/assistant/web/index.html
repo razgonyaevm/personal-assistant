@@ -9,12 +9,26 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg: var(--tg-theme-bg-color, #0f172a);
-            --card: var(--tg-theme-secondary-bg-color, #1e293b);
-            --text: var(--tg-theme-text-color, #f1f5f9);
-            --hint: var(--tg-theme-hint-color, #94a3b8);
-            --accent: var(--tg-theme-button-color, #38bdf8);
-            --accent-text: var(--tg-theme-button-text-color, #0f172a);
+            --bg: var(--tg-theme-secondary-bg-color, #f1f5f9);
+            --card: var(--tg-theme-bg-color, #ffffff);
+            --subcard: var(--tg-theme-secondary-bg-color, #f8fafc);
+            --text: var(--tg-theme-text-color, #0f172a);
+            --hint: var(--tg-theme-hint-color, #64748b);
+            --accent: var(--tg-theme-button-color, #0284c7);
+            --accent-text: var(--tg-theme-button-text-color, #ffffff);
+            --border: rgba(128, 128, 128, 0.22);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: var(--tg-theme-secondary-bg-color, #0b1120);
+                --card: var(--tg-theme-bg-color, #1e293b);
+                --subcard: var(--tg-theme-secondary-bg-color, #0f172a);
+                --text: var(--tg-theme-text-color, #f1f5f9);
+                --hint: var(--tg-theme-hint-color, #94a3b8);
+                --accent: var(--tg-theme-button-color, #38bdf8);
+                --accent-text: var(--tg-theme-button-text-color, #0f172a);
+            }
         }
 
         body {
@@ -25,6 +39,18 @@
 
         .card {
             background-color: var(--card);
+            border: 1px solid var(--border);
+        }
+
+        .subcard {
+            background-color: var(--subcard);
+            border: 1px solid var(--border);
+        }
+
+        .input-box {
+            background-color: var(--subcard);
+            color: var(--text);
+            border: 1px solid var(--border);
         }
 
         .hint {
@@ -34,6 +60,16 @@
         .btn-accent {
             background-color: var(--accent);
             color: var(--accent-text);
+        }
+
+        .btn-ghost {
+            background-color: var(--subcard);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .border-subtle {
+            border-color: var(--border);
         }
 
         .tab-active {
@@ -46,22 +82,24 @@
 <body class="min-h-screen flex flex-col">
 
 <!-- Шапка -->
-<header class="card px-4 py-3 flex items-center justify-between border-b border-white/10 sticky top-0 z-20">
+<header class="px-4 py-3 flex items-center justify-between border-b border-subtle sticky top-0 z-20"
+        style="background-color: var(--card);">
     <div>
         <h1 class="text-base font-bold leading-tight">Personal Assistant</h1>
         <p id="sub-status" class="text-xs hint">Загрузка...</p>
     </div>
-    <button onclick="refreshActiveTab()" class="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">
+    <button onclick="refreshActiveTab()" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">
         ↻ Обновить
     </button>
 </header>
 
-<!-- Навигация (3 вкладки без лишнего чата) -->
-<nav class="card flex justify-around text-xs sm:text-sm border-b border-white/10 sticky top-[57px] z-10">
-    <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="py-2.5 px-4 tab-active">📅 Планы и погода
-    </button>
-    <button onclick="switchTab('expenses')" id="tab-btn-expenses" class="py-2.5 px-4 hint">💰 Расходы</button>
-    <button onclick="switchTab('system')" id="tab-btn-system" class="py-2.5 px-4 hint">⚙️ Система</button>
+<!-- Навигация -->
+<nav class="flex justify-around text-xs sm:text-sm border-b border-subtle sticky top-[57px] z-10"
+     style="background-color: var(--card);">
+    <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="py-2.5 px-2.5 tab-active">📅 Планы</button>
+    <button onclick="switchTab('todos')" id="tab-btn-todos" class="py-2.5 px-2.5 hint">✅ Задачи</button>
+    <button onclick="switchTab('expenses')" id="tab-btn-expenses" class="py-2.5 px-2.5 hint">💰 Расходы</button>
+    <button onclick="switchTab('system')" id="tab-btn-system" class="py-2.5 px-2.5 hint">⚙️ Система</button>
 </nav>
 
 <!-- Контент -->
@@ -69,22 +107,20 @@
 
     <!-- Вкладка 1: Погода + Расписание по дням + Напоминания -->
     <section id="tab-schedule" class="space-y-4">
-
-        <!-- Виджет погоды -->
-        <div class="card p-4 rounded-2xl border border-white/10 space-y-3">
+        <div class="card p-4 rounded-2xl space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <div class="text-xs hint uppercase tracking-wider">Погода сейчас</div>
                     <div class="flex items-baseline gap-2 mt-0.5">
                         <span id="w-city" class="text-lg font-bold">Санкт-Петербург</span>
-                        <span id="w-temp" class="text-2xl font-extrabold text-sky-400">—°</span>
+                        <span id="w-temp" class="text-2xl font-extrabold text-sky-500">—°</span>
                     </div>
                     <div id="w-desc" class="text-xs sm:text-sm mt-0.5">Загружаем прогноз...</div>
                 </div>
 
                 <form onsubmit="changeCity(event)" class="flex gap-1.5 items-center">
                     <input id="w-city-input" type="text" placeholder="Другой город..."
-                           class="w-32 sm:w-40 bg-black/20 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs outline-none"/>
+                           class="input-box w-32 sm:w-40 rounded-lg px-2.5 py-1.5 text-xs outline-none"/>
                     <button type="submit" class="btn-accent px-2.5 py-1.5 rounded-lg text-xs font-semibold">ОК</button>
                 </form>
             </div>
@@ -93,7 +129,6 @@
             <div id="w-strip" class="flex gap-2 overflow-x-auto pb-1 pt-1"></div>
         </div>
 
-        <!-- Расписание по дням -->
         <div class="space-y-3">
             <div class="flex items-center justify-between px-1">
                 <h2 class="text-sm font-semibold">🎓 Расписание по дням (7 дней)</h2>
@@ -102,20 +137,61 @@
             <div id="sched-days" class="space-y-3"></div>
         </div>
 
-        <!-- Напоминания -->
-        <div class="card p-4 rounded-2xl border border-white/10">
+        <div class="card p-4 rounded-2xl">
             <h3 class="text-sm font-semibold mb-3">⏰ Активные напоминания</h3>
             <div id="sched-reminders" class="space-y-2 text-sm"></div>
         </div>
     </section>
 
-    <!-- Вкладка 2: Расходы -->
+    <!-- Вкладка 2: To-Do список -->
+    <section id="tab-todos" class="hidden space-y-4">
+        <form onsubmit="createTodo(event)" class="card p-3.5 rounded-2xl space-y-2.5">
+            <input id="todo-title" type="text" placeholder="Новая задача..." required
+                   class="input-box w-full rounded-lg px-3 py-2 text-sm outline-none"/>
+            <div class="flex flex-wrap gap-2 items-center">
+                <select id="todo-cat" class="input-box rounded-lg px-2.5 py-1.5 text-xs">
+                    <option value="Учёба">Учёба</option>
+                    <option value="Т-Академия">Т-Академия</option>
+                    <option value="Проект">Проект</option>
+                    <option value="Личное">Личное</option>
+                    <option value="Общее" selected>Общее</option>
+                </select>
+                <select id="todo-prio" class="input-box rounded-lg px-2.5 py-1.5 text-xs">
+                    <option value="high">🔴 Высокий</option>
+                    <option value="medium" selected>🟡 Средний</option>
+                    <option value="low">⚪ Низкий</option>
+                </select>
+                <input id="todo-due" type="date"
+                       class="input-box rounded-lg px-2 py-1 text-xs"/>
+                <input id="todo-time" type="time" title="Время (необязательно)"
+                       class="input-box rounded-lg px-2 py-1 text-xs"/>
+                <button type="submit" class="btn-accent ml-auto px-3.5 py-1.5 rounded-lg text-xs font-semibold">
+                    + Добавить
+                </button>
+            </div>
+        </form>
+
+        <div class="card p-4 rounded-2xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold">Активные задачи</h3>
+                <span id="todo-open-count" class="text-xs hint"></span>
+            </div>
+            <div id="todo-open-list" class="space-y-2"></div>
+        </div>
+
+        <div class="card p-4 rounded-2xl">
+            <h3 class="text-sm font-semibold mb-3 hint">Выполненные</h3>
+            <div id="todo-done-list" class="space-y-2 opacity-75"></div>
+        </div>
+    </section>
+
+    <!-- Вкладка 3: Расходы -->
     <section id="tab-expenses" class="hidden space-y-4">
-        <div class="card p-4 rounded-2xl border border-white/10 flex flex-wrap gap-3 items-center justify-between">
+        <div class="card p-4 rounded-2xl flex flex-wrap gap-3 items-center justify-between">
             <div>
                 <label class="text-xs hint block">Месяц</label>
                 <input id="exp-month" type="month" onchange="loadExpenses()"
-                       class="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm mt-1"/>
+                       class="input-box rounded-lg px-2 py-1 text-sm mt-1"/>
             </div>
             <label class="flex items-center gap-2 text-xs cursor-pointer">
                 <input id="exp-no-transfers" type="checkbox" onchange="loadExpenses()" class="rounded"/>
@@ -128,34 +204,104 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="card p-4 rounded-2xl border border-white/10 flex flex-col items-center">
+            <div class="card p-4 rounded-2xl flex flex-col items-center">
                 <h3 class="text-sm font-semibold mb-2 self-start">Структура трат</h3>
                 <div class="w-full max-w-[240px]">
                     <canvas id="exp-chart"></canvas>
                 </div>
             </div>
-            <div class="card p-4 rounded-2xl border border-white/10">
+            <div class="card p-4 rounded-2xl">
                 <h3 class="text-sm font-semibold mb-3">По категориям</h3>
                 <div id="exp-categories" class="space-y-2.5 text-sm"></div>
             </div>
         </div>
 
-        <div class="card p-4 rounded-2xl border border-white/10">
+        <div class="card p-4 rounded-2xl">
             <h3 class="text-sm font-semibold mb-3">Последние операции</h3>
-            <div id="exp-list" class="divide-y divide-white/10 text-xs sm:text-sm"></div>
+            <div id="exp-list" class="divide-y border-subtle text-xs sm:text-sm"></div>
         </div>
     </section>
 
-    <!-- Вкладка 3: Система -->
+    <!-- Вкладка 4: Система -->
     <section id="tab-system" class="hidden space-y-4">
         <div id="sys-stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
-        <div class="card p-4 rounded-2xl border border-white/10">
+        <div class="card p-4 rounded-2xl">
             <h3 class="text-sm font-semibold mb-3">📋 Общая очередь задач</h3>
             <div id="sys-tasks" class="space-y-2 text-xs sm:text-sm"></div>
         </div>
     </section>
 
 </main>
+
+<!-- Модальное окно редактирования задачи -->
+<div id="todo-edit-modal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <form onsubmit="saveEditTodo(event)" class="card w-full max-w-md p-4 rounded-2xl space-y-3 shadow-2xl">
+        <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold">Редактировать задачу</h3>
+            <button type="button" onclick="closeEditTodo()" class="hint text-base px-2">✕</button>
+        </div>
+
+        <input id="edit-todo-id" type="hidden"/>
+
+        <div>
+            <label class="text-xs hint block mb-1">Название</label>
+            <input id="edit-todo-title" type="text" required
+                   class="input-box w-full rounded-lg px-3 py-2 text-sm outline-none"/>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="text-xs hint block mb-1">Категория</label>
+                <select id="edit-todo-cat" class="input-box w-full rounded-lg px-2.5 py-1.5 text-xs">
+                    <option value="Учёба">Учёба</option>
+                    <option value="Т-Академия">Т-Академия</option>
+                    <option value="Проект">Проект</option>
+                    <option value="Личное">Личное</option>
+                    <option value="Покупки">Покупки</option>
+                    <option value="Общее">Общее</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs hint block mb-1">Приоритет</label>
+                <select id="edit-todo-prio" class="input-box w-full rounded-lg px-2.5 py-1.5 text-xs">
+                    <option value="high">🔴 Высокий</option>
+                    <option value="medium">🟡 Средний</option>
+                    <option value="low">⚪ Низкий</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <label class="text-xs hint">Дедлайн (необязательно)</label>
+                <button type="button" onclick="clearEditDue()" class="text-[11px] text-sky-500">Очистить дату</button>
+            </div>
+            <div class="flex gap-2">
+                <input id="edit-todo-due" type="date" class="input-box flex-1 rounded-lg px-2 py-1.5 text-xs"/>
+                <input id="edit-todo-time" type="time" class="input-box w-28 rounded-lg px-2 py-1.5 text-xs"/>
+            </div>
+        </div>
+
+        <div>
+            <label class="text-xs hint block mb-1">Заметки</label>
+            <textarea id="edit-todo-notes" rows="2" placeholder="Детали или ссылка..."
+                      class="input-box w-full rounded-lg px-3 py-1.5 text-xs outline-none"></textarea>
+        </div>
+
+        <div id="edit-todo-error" class="hidden text-xs text-rose-500"></div>
+
+        <div class="flex justify-end gap-2 pt-1">
+            <button type="button" onclick="closeEditTodo()" class="btn-ghost px-3.5 py-1.5 rounded-lg text-xs">
+                Отмена
+            </button>
+            <button id="edit-todo-save-btn" type="submit"
+                    class="btn-accent px-4 py-1.5 rounded-lg text-xs font-semibold">
+                Сохранить
+            </button>
+        </div>
+    </form>
+</div>
 
 <script>
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -164,6 +310,7 @@
         tg.expand();
     }
 
+    let todosById = {};
     let activeTab = 'schedule';
     let currentCity = 'Санкт-Петербург';
     let weatherByDate = {};
@@ -218,10 +365,10 @@
 
     function switchTab(name) {
         activeTab = name;
-        for (const t of ['schedule', 'expenses', 'system']) {
+        for (const t of ['schedule', 'todos', 'expenses', 'system']) {
             document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
             document.getElementById(`tab-btn-${t}`).className =
-                t === name ? 'py-2.5 px-4 tab-active' : 'py-2.5 px-4 hint';
+                t === name ? 'py-2.5 px-2.5 tab-active' : 'py-2.5 px-2.5 hint';
         }
         refreshActiveTab();
     }
@@ -254,11 +401,11 @@
                 const dt = new Date(y, m - 1, d);
                 const icon = (day.weather_description || '').split(' ').pop() || '';
                 return `
-            <div class="min-w-[76px] p-2 rounded-xl bg-black/20 border border-white/5 text-center shrink-0">
+            <div class="subcard min-w-[76px] p-2 rounded-xl text-center shrink-0">
               <div class="text-[11px] hint">${SHORT_DAYS[dt.getDay()]} ${d}</div>
               <div class="text-base my-0.5">${escapeHtml(icon)}</div>
               <div class="text-xs font-semibold">${Math.round(day.temp_max_c)}° <span class="hint font-normal">${Math.round(day.temp_min_c)}°</span></div>
-              <div class="text-[10px] text-sky-400">💧${day.precipitation_probability_pct ?? 0}%</div>
+              <div class="text-[10px] text-sky-500 font-medium">💧${day.precipitation_probability_pct ?? 0}%</div>
             </div>`;
             }).join('');
             document.getElementById('w-strip').innerHTML = stripHtml;
@@ -267,10 +414,26 @@
         }
     }
 
+    function toLocalDateKey(dt) {
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    }
+
+    async function toggleTodoInSchedule(id) {
+        await apiFetch(`/api/todos/${id}/toggle`, {method: 'POST'});
+        await loadSchedule();
+    }
+
     async function loadSchedule() {
         const data = await apiFetch('/api/schedule');
         const grouped = {};
         let totalEvents = 0;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const end = new Date(today);
+        end.setDate(end.getDate() + 7);
+        const minKey = toLocalDateKey(today);
+        const maxKey = toLocalDateKey(end);
 
         const addEvent = (dateKey, item) => {
             if (!dateKey) return;
@@ -281,10 +444,12 @@
 
         for (const ev of (data.external || [])) {
             const dKey = ev.start.slice(0, 10);
+            const st = ev.start.slice(11, 16);
             addEvent(dKey, {
                 kind: 'external',
+                sortKey: `1_${st}`,
                 title: ev.summary,
-                startTime: ev.start.slice(11, 16),
+                startTime: st,
                 endTime: ev.end ? ev.end.slice(11, 16) : '',
                 location: ev.location || '',
                 link: extractUrl(ev.description) || extractUrl(ev.location),
@@ -293,14 +458,54 @@
 
         for (const ev of (data.personal || [])) {
             const dKey = ev.start_at.slice(0, 10);
+            const st = ev.start_at.slice(11, 16);
             addEvent(dKey, {
                 kind: 'personal',
+                sortKey: `1_${st}`,
                 title: ev.title,
-                startTime: ev.start_at.slice(11, 16),
+                startTime: st,
                 endTime: ev.end_at ? ev.end_at.slice(11, 16) : '',
                 location: ev.location || '',
                 link: extractUrl(ev.location) || extractUrl(ev.notes),
             });
+        }
+
+        // Добавляем To-Do задачи, у которых есть дата в ближайшие 7 дней
+        for (const t of (data.todos || [])) {
+            todosById[t.id] = t;
+            if (!t.due_date) continue;
+            const dKey = t.due_date.slice(0, 10);
+            if (dKey < minKey || dKey > maxKey) continue;
+
+            const timeMatch = t.due_date.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/);
+            if (timeMatch) {
+                addEvent(dKey, {
+                    kind: 'todo',
+                    todoId: t.id,
+                    priority: t.priority,
+                    category: t.category,
+                    sortKey: `1_${timeMatch[1]}`,
+                    title: t.title,
+                    startTime: timeMatch[1],
+                    endTime: 'дедлайн',
+                    location: '',
+                    link: null,
+                });
+            } else {
+                // Без времени — ставим в самое начало дня
+                addEvent(dKey, {
+                    kind: 'todo',
+                    todoId: t.id,
+                    priority: t.priority,
+                    category: t.category,
+                    sortKey: '0_00:00',
+                    title: t.title,
+                    startTime: 'Задача',
+                    endTime: 'весь день',
+                    location: '',
+                    link: null,
+                });
+            }
         }
 
         document.getElementById('sched-count').textContent = `событий: ${totalEvents}`;
@@ -311,26 +516,47 @@
             daysBox.innerHTML = '<div class="card p-4 rounded-2xl text-sm hint">На ближайшие 7 дней событий не найдено</div>';
         } else {
             daysBox.innerHTML = sortedDates.map(dKey => {
-                const items = grouped[dKey].sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const items = grouped[dKey].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
                 const wDay = weatherByDate[dKey];
                 const weatherBadge = wDay
-                    ? `<span class="text-xs px-2 py-0.5 rounded-full bg-white/10 whitespace-nowrap">${escapeHtml((wDay.weather_description || '').split(' ').pop())} ${Math.round(wDay.temp_max_c)}°/${Math.round(wDay.temp_min_c)}°</span>`
+                    ? `<span class="subcard text-xs px-2 py-0.5 rounded-full whitespace-nowrap">${escapeHtml((wDay.weather_description || '').split(' ').pop())} ${Math.round(wDay.temp_max_c)}°/${Math.round(wDay.temp_min_c)}°</span>`
                     : '';
 
                 const rowsHtml = items.map(item => {
                     const isPersonal = item.kind === 'personal';
+                    const isTodo = item.kind === 'todo';
                     const isSport = item.title.toLowerCase().includes('баскетбол') || item.title.toLowerCase().includes('спорт');
-                    const barColor = isPersonal ? 'bg-emerald-400' : (isSport ? 'bg-amber-400' : 'bg-sky-400');
-                    const tag = isPersonal ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Личное</span>' : '';
+
+                    let barColor = 'bg-sky-500';
+                    if (isPersonal) barColor = 'bg-emerald-500';
+                    else if (isTodo) barColor = item.priority === 'high' ? 'bg-rose-500' : 'bg-violet-500';
+                    else if (isSport) barColor = 'bg-amber-500';
+
+                    let tag = '';
+                    if (isPersonal) {
+                        tag = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-medium">Личное</span>';
+                    } else if (isTodo) {
+                        tag = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-500 font-medium">To-Do · ${escapeHtml(item.category)}</span>`;
+                    }
+
+                    const todoBtn = isTodo
+                        ? `<div class="flex items-center gap-1.5 self-center shrink-0">
+              <button onclick="openEditTodo(${item.todoId})" title="Редактировать" class="text-xs hint hover:text-sky-500 px-1">✏️</button>
+              <button onclick="toggleTodoInSchedule(${item.todoId})" title="Отметить выполненной"
+                      style="background-color: var(--card); border: 1.5px solid var(--hint);"
+                      class="w-5 h-5 rounded-md flex items-center justify-center text-xs"></button>
+            </div>`
+                        : '';
+
                     const linkBtn = item.link
-                        ? `<a href="${escapeHtml(item.link)}" target="_blank" class="inline-block mt-1 text-[11px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">🔗 Подключиться</a>`
+                        ? `<a href="${escapeHtml(item.link)}" target="_blank" class="inline-block mt-1 text-[11px] px-2 py-0.5 rounded bg-sky-500/15 text-sky-500 font-medium">🔗 Подключиться</a>`
                         : '';
 
                     return `
-              <div class="flex gap-3 items-stretch py-2 border-t border-white/5 first:border-t-0">
-                <div class="w-12 shrink-0 text-right">
+              <div class="flex gap-3 items-stretch py-2 border-t border-subtle first:border-t-0">
+                <div class="w-14 shrink-0 text-right">
                   <div class="text-xs font-bold">${escapeHtml(item.startTime)}</div>
-                  <div class="text-[11px] hint">${escapeHtml(item.endTime)}</div>
+                  <div class="text-[10px] hint">${escapeHtml(item.endTime)}</div>
                 </div>
                 <div class="w-1 rounded-full ${barColor} shrink-0"></div>
                 <div class="flex-1 min-w-0">
@@ -340,11 +566,12 @@
                   ${item.location ? `<div class="text-xs hint mt-0.5">📍 ${escapeHtml(item.location)}</div>` : ''}
                   ${linkBtn}
                 </div>
+                ${todoBtn}
               </div>`;
                 }).join('');
 
                 return `
-            <div class="card p-3.5 rounded-2xl border border-white/10">
+            <div class="card p-3.5 rounded-2xl">
               <div class="flex items-center justify-between gap-2 mb-2">
                 <div class="text-sm font-bold">${escapeHtml(formatDayLabel(dKey))}</div>
                 ${weatherBadge}
@@ -355,7 +582,7 @@
         }
 
         document.getElementById('sched-reminders').innerHTML = (data.reminders || []).map(r => `
-        <div class="p-2.5 rounded-xl bg-black/20 flex justify-between gap-2 items-center">
+        <div class="subcard p-2.5 rounded-xl flex justify-between gap-2 items-center">
           <div>
             <div class="font-medium text-sm">${escapeHtml(r.text)}</div>
             <div class="hint text-xs">${escapeHtml(r.schedule_type)} · след. ${escapeHtml(r.next_run_at.slice(0, 16).replace('T', ' '))}</div>
@@ -366,6 +593,93 @@
     async function loadWeatherAndSchedule() {
         await loadWeather();
         await loadSchedule();
+    }
+
+    async function loadTodos() {
+        const items = await apiFetch('/api/todos?status=all');
+        todosById = {};
+        for (const t of items) todosById[t.id] = t;
+        const openItems = items.filter(t => t.status !== 'done');
+        const doneItems = items.filter(t => t.status === 'done');
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        document.getElementById('todo-open-count').textContent = `осталось: ${openItems.length}`;
+        const prioBadge = {
+            high: '<span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">Высокий</span>',
+            medium: '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-semibold">Средний</span>',
+            low: '<span class="subcard text-[10px] px-1.5 py-0.5 rounded hint">Низкий</span>',
+        };
+
+        const renderRow = (t) => {
+            const isDone = t.status === 'done';
+            const overdue = !isDone && t.due_date && t.due_date.slice(0, 10) < todayStr;
+            const boxStyle = isDone
+                ? 'background-color: var(--accent); color: var(--accent-text); border: 1.5px solid var(--accent);'
+                : 'background-color: var(--card); border: 1.5px solid var(--hint);';
+
+            return `
+          <div class="subcard p-3 rounded-xl flex items-start gap-3">
+            <button onclick="toggleTodo(${t.id})"
+                    style="${boxStyle}"
+                    class="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 text-xs font-bold">
+              ${isDone ? '✓' : ''}
+            </button>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium leading-snug ${isDone ? 'line-through hint' : ''}">${escapeHtml(t.title)}</div>
+              <div class="flex flex-wrap gap-1.5 items-center mt-1.5">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-500 font-semibold">${escapeHtml(t.category)}</span>
+                ${prioBadge[t.priority] || ''}
+                ${t.due_date ? `<span class="text-[11px] ${overdue ? 'text-rose-500 font-semibold' : 'hint'}">📅 ${escapeHtml(t.due_date)}</span>` : ''}
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+           <button onclick="openEditTodo(${t.id})" title="Редактировать" class="text-xs hint hover:text-sky-500 px-1.5 py-0.5">✏️</button>
+           <button onclick="deleteTodo(${t.id})" title="Удалить" class="text-xs hint hover:text-rose-500 px-1.5 py-0.5">✕</button>
+         </div>
+          </div>`;
+        };
+
+        document.getElementById('todo-open-list').innerHTML =
+            openItems.map(renderRow).join('') || '<div class="text-xs hint">Все задачи выполнены!</div>';
+        document.getElementById('todo-done-list').innerHTML =
+            doneItems.slice(0, 15).map(renderRow).join('') || '<div class="text-xs hint">Пока пусто</div>';
+    }
+
+    async function createTodo(e) {
+        e.preventDefault();
+        const title = document.getElementById('todo-title').value.trim();
+        if (!title) return;
+
+        const dueDate = document.getElementById('todo-due').value;
+        const dueTime = document.getElementById('todo-time').value;
+        let fullDue = null;
+        if (dueDate) {
+            fullDue = dueTime ? `${dueDate} ${dueTime}` : dueDate;
+        }
+
+        await apiFetch('/api/todos', {
+            method: 'POST',
+            body: JSON.stringify({
+                title,
+                category: document.getElementById('todo-cat').value,
+                priority: document.getElementById('todo-prio').value,
+                due_date: fullDue,
+            }),
+        });
+        document.getElementById('todo-title').value = '';
+        document.getElementById('todo-due').value = '';
+        document.getElementById('todo-time').value = '';
+        await loadTodos();
+    }
+
+    async function toggleTodo(id) {
+        await apiFetch(`/api/todos/${id}/toggle`, {method: 'POST'});
+        await loadTodos();
+    }
+
+    async function deleteTodo(id) {
+        await apiFetch(`/api/todos/${id}`, {method: 'DELETE'});
+        await loadTodos();
     }
 
     async function loadExpenses() {
@@ -387,8 +701,8 @@
               <span>${escapeHtml(c.category)} <span class="hint text-xs">(${c.count})</span></span>
               <span class="font-semibold">${c.sum_rub.toLocaleString('ru-RU')} ₽ <span class="hint text-xs">${c.percent}%</span></span>
             </div>
-            <div class="w-full h-1.5 bg-black/25 rounded-full mt-1 overflow-hidden">
-              <div class="h-full bg-sky-400 rounded-full" style="width:${Math.min(100, c.percent)}%"></div>
+            <div class="w-full h-1.5 rounded-full mt-1 overflow-hidden" style="background-color: var(--subcard);">
+              <div class="h-full bg-sky-500 rounded-full" style="width:${Math.min(100, c.percent)}%"></div>
             </div>
           </div>`;
         }
@@ -401,7 +715,7 @@
                 labels,
                 datasets: [{
                     data: values,
-                    backgroundColor: ['#38bdf8', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#60a5fa', '#2dd4bf', '#f97316', '#94a3b8'],
+                    backgroundColor: ['#0ea5e9', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#3b82f6', '#14b8a6', '#f97316', '#64748b'],
                     borderWidth: 0
                 }]
             },
@@ -422,19 +736,92 @@
         const data = await apiFetch('/api/system');
         const s = data.stats;
         document.getElementById('sys-stats').innerHTML = `
-        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Запросов</div><div class="text-lg font-bold">${s.requests}</div></div>
-        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Токенов</div><div class="text-lg font-bold">${s.total_tokens.toLocaleString()}</div></div>
-        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Расход</div><div class="text-lg font-bold">$${s.total_cost_usd}</div></div>
-        <div class="card p-3 rounded-xl border border-white/10"><div class="hint text-xs">Ср. задержка</div><div class="text-lg font-bold">${s.avg_latency_ms} мс</div></div>`;
+        <div class="card p-3 rounded-xl"><div class="hint text-xs">Запросов</div><div class="text-lg font-bold">${s.requests}</div></div>
+        <div class="card p-3 rounded-xl"><div class="hint text-xs">Токенов</div><div class="text-lg font-bold">${s.total_tokens.toLocaleString()}</div></div>
+        <div class="card p-3 rounded-xl"><div class="hint text-xs">Расход</div><div class="text-lg font-bold">$${s.total_cost_usd}</div></div>
+        <div class="card p-3 rounded-xl"><div class="hint text-xs">Ср. задержка</div><div class="text-lg font-bold">${s.avg_latency_ms} мс</div></div>`;
 
         document.getElementById('sys-tasks').innerHTML = (data.tasks || []).map(t => `
-        <div class="p-2.5 rounded-lg bg-black/20 flex justify-between gap-2">
+        <div class="subcard p-2.5 rounded-lg flex justify-between gap-2">
           <div>
             <span class="font-semibold">#${t.id}</span> <span class="hint">[${escapeHtml(t.channel)}/${escapeHtml(t.kind)}]</span>
             <div class="mt-0.5">${escapeHtml(t.prompt.slice(0, 90))}</div>
           </div>
-          <span class="px-2 py-0.5 h-fit rounded text-xs bg-white/10">${escapeHtml(t.status)}</span>
+          <span class="card px-2 py-0.5 h-fit rounded text-xs">${escapeHtml(t.status)}</span>
         </div>`).join('');
+    }
+
+    function openEditTodo(id) {
+        const t = todosById[id];
+        if (!t) return;
+
+        document.getElementById('edit-todo-id').value = t.id;
+        document.getElementById('edit-todo-title').value = t.title || '';
+        document.getElementById('edit-todo-prio').value = t.priority || 'medium';
+        document.getElementById('edit-todo-notes').value = t.notes || '';
+        document.getElementById('edit-todo-error').classList.add('hidden');
+
+        // Если у задачи нестандартная категория (добавленная агентом), подставим её в select
+        const catSel = document.getElementById('edit-todo-cat');
+        const catVal = t.category || 'Общее';
+        if (![...catSel.options].some(o => o.value === catVal)) {
+            const opt = document.createElement('option');
+            opt.value = catVal;
+            opt.textContent = catVal;
+            catSel.appendChild(opt);
+        }
+        catSel.value = catVal;
+
+        const due = t.due_date || '';
+        document.getElementById('edit-todo-due').value = due.slice(0, 10);
+        const tm = due.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/);
+        document.getElementById('edit-todo-time').value = tm ? tm[1] : '';
+
+        document.getElementById('todo-edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditTodo() {
+        document.getElementById('todo-edit-modal').classList.add('hidden');
+    }
+
+    function clearEditDue() {
+        document.getElementById('edit-todo-due').value = '';
+        document.getElementById('edit-todo-time').value = '';
+    }
+
+    async function saveEditTodo(e) {
+        e.preventDefault();
+        const errBox = document.getElementById('edit-todo-error');
+        const saveBtn = document.getElementById('edit-todo-save-btn');
+        errBox.classList.add('hidden');
+
+        const id = document.getElementById('edit-todo-id').value;
+        const dueDate = document.getElementById('edit-todo-due').value;
+        const dueTime = document.getElementById('edit-todo-time').value;
+        const fullDue = dueDate ? (dueTime ? `${dueDate} ${dueTime}` : dueDate) : '';
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Сохранение...';
+        try {
+            await apiFetch(`/api/todos/${id}/update`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: document.getElementById('edit-todo-title').value.trim(),
+                    category: document.getElementById('edit-todo-cat').value,
+                    priority: document.getElementById('edit-todo-prio').value,
+                    due_date: fullDue,
+                    notes: document.getElementById('edit-todo-notes').value,
+                }),
+            });
+            closeEditTodo();
+            await refreshActiveTab();
+        } catch (err) {
+            errBox.textContent = `Ошибка сохранения: ${err.message}`;
+            errBox.classList.remove('hidden');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Сохранить';
+        }
     }
 
     async function refreshActiveTab() {
@@ -445,6 +832,7 @@
             document.getElementById('sub-status').textContent = `Нет связи`;
         }
         if (activeTab === 'schedule') await loadWeatherAndSchedule();
+        if (activeTab === 'todos') await loadTodos();
         if (activeTab === 'expenses') await loadExpenses();
         if (activeTab === 'system') await loadSystem();
     }

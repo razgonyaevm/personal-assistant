@@ -221,7 +221,13 @@ def api_schedule() -> dict[str, Any]:
         external = []
     personal = rt.calendar.list_personal_events()
     reminders = rt.reminders.list_reminders()
-    return {"external": external, "personal": personal, "reminders": reminders}
+    todos = [t for t in rt.todos.list_todos(status="open") if t.get("due_date")]
+    return {
+        "external": external,
+        "personal": personal,
+        "reminders": reminders,
+        "todos": todos,
+    }
 
 
 @app.get("/api/system", dependencies=[Depends(require_dashboard_auth)])
@@ -301,6 +307,64 @@ async def reset_session(session_id: str) -> dict[str, str]:
     async with _runtime_lock:
         await asyncio.to_thread(rt.memory.clear_session, session_id)
     return {"status": "ok", "session_id": session_id}
+
+
+class TodoCreateRequest(BaseModel):
+    title: str
+    category: str = "Общее"
+    priority: str = "medium"
+    due_date: str | None = None
+
+
+@app.get("/api/todos", dependencies=[Depends(require_dashboard_auth)])
+def api_list_todos(status: str = "all") -> list[dict[str, Any]]:
+    return _rt().todos.list_todos(status=status)
+
+
+@app.post("/api/todos", dependencies=[Depends(require_dashboard_auth)])
+def api_create_todo(req: TodoCreateRequest) -> dict[str, Any]:
+    return _rt().todos.add_todo(
+        title=req.title,
+        category=req.category,
+        priority=req.priority,
+        due_date=req.due_date,
+    )
+
+
+@app.post("/api/todos/{todo_id}/toggle", dependencies=[Depends(require_dashboard_auth)])
+def api_toggle_todo(todo_id: int) -> dict[str, Any]:
+    return _rt().todos.toggle_todo(todo_id)
+
+
+@app.delete("/api/todos/{todo_id}", dependencies=[Depends(require_dashboard_auth)])
+def api_delete_todo(todo_id: int) -> dict[str, Any]:
+    return _rt().todos.delete_todo(todo_id)
+
+
+class TodoUpdateRequest(BaseModel):
+    title: str | None = None
+    category: str | None = None
+    priority: str | None = None
+    due_date: str | None = None
+    status: str | None = None
+    notes: str | None = None
+
+
+@app.post("/api/todos/{todo_id}/update", dependencies=[Depends(require_dashboard_auth)])
+@app.put("/api/todos/{todo_id}", dependencies=[Depends(require_dashboard_auth)])
+def api_update_todo(todo_id: int, req: TodoUpdateRequest) -> dict[str, Any]:
+    res = _rt().todos.update_todo(
+        todo_id=todo_id,
+        title=req.title,
+        category=req.category,
+        priority=req.priority,
+        due_date=req.due_date,
+        status=req.status,
+        notes=req.notes,
+    )
+    if res.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return res
 
 
 if __name__ == "__main__":

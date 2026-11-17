@@ -42,29 +42,57 @@ def web_search(
         max_results: int = 5,
 ) -> list[dict[str, Any]]:
     max_results = max(1, min(10, int(max_results)))
-    with DDGS(timeout=6) as ddgs:
-        if kind == "news":
-            raw = list(ddgs.news(query, max_results=max_results))
-            return [
-                {
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "date": item.get("date", ""),
-                    "source": item.get("source", ""),
-                    "snippet": item.get("body", ""),
-                }
-                for item in raw
-            ]
+    backends = ("duckduckgo", "bing", "google", "brave", "auto")
+    last_error: Exception | None = None
 
-        raw = list(ddgs.text(query, max_results=max_results))
-        return [
-            {
-                "title": item.get("title", ""),
-                "url": item.get("href", ""),
-                "snippet": item.get("body", ""),
-            }
-            for item in raw
-        ]
+    for backend in backends:
+        try:
+            with DDGS(timeout=7) as ddgs:
+                if kind == "news":
+                    raw = list(
+                        ddgs.news(
+                            query,
+                            region="ru-ru",
+                            max_results=max_results,
+                            backend=backend,
+                        )
+                    )
+                    if raw:
+                        return [
+                            {
+                                "title": item.get("title", ""),
+                                "url": item.get("url", ""),
+                                "date": item.get("date", ""),
+                                "source": item.get("source", ""),
+                                "snippet": item.get("body", ""),
+                            }
+                            for item in raw
+                        ]
+                else:
+                    raw = list(
+                        ddgs.text(
+                            query,
+                            region="ru-ru",
+                            max_results=max_results,
+                            backend=backend,
+                        )
+                    )
+                    if raw:
+                        return [
+                            {
+                                "title": item.get("title", ""),
+                                "url": item.get("href", ""),
+                                "snippet": item.get("body", ""),
+                            }
+                            for item in raw
+                        ]
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    if last_error:
+        raise last_error
+    return []
 
 
 def fetch_webpage(url: str, max_chars: int = 6000) -> dict[str, Any]:

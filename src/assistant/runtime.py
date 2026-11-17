@@ -85,16 +85,24 @@ class AssistantRuntime:
 
     def build_system_prompt(self) -> str:
         standards = build_standards_prompt(self.workspace_dir, self.skills)
+        now = datetime.now().astimezone()
+        weekdays = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+        now_str = f"{now.strftime('%Y-%m-%d %H:%M %Z')} ({weekdays[now.weekday()]})"
+
         base = (
-            "Ты персональный ИИ-ассистент.\n"
+            f"Ты персональный ИИ-ассистент. Сейчас: {now_str}. Основной город пользователя: Санкт-Петербург.\n"
+            "Важное правило: если для ответа нужно выполнить действие или догрузить данные (поиск, "
+            "открытие страницы fetch_webpage, расписание, почта и т.д.) — сразу вызывай инструмент! "
+            "НИКОГДА не пиши пользователю «сейчас попробую найти» или «мне нужно узнать дату» без реального вызова tool_calls.\n"
             "Доступные возможности:\n"
             "- Долговременная память (memory_save / memory_search): сохраняй важные факты и предпочтения.\n"
             "- Файловая система workspace (list_directory, read_file, write_file, edit_file).\n"
             "- Изолированная Docker-песочница (run_shell для bash/pwsh, run_python, get_system_info).\n"
-            "- MCP-инструменты, поиск в интернете (web_search, fetch_webpage), GitHub API и GitLab Т-Академии (gitlab_*).\n"
-            "- Личный календарь, внешний календарь .ics и напоминания.\n"
+            "- MCP-инструменты, поиск в интернете (web_search, fetch_webpage).\n"
+            "- GitHub API и GitLab Т-Академии (github_*, gitlab_*).\n"
             "- Почта Gmail (email_*): просмотр, чтение, вложения, перенос в корзину, отправка после подтверждения.\n"
-            "Перед планированием дат или расписания проверяй текущее время через get_current_time."
+            "- Личный календарь, внешний календарь .ics и напоминания.\n"
+            "- Погода (по умолчанию Санкт-Петербург), маркетплейсы, PDF-анализатор, Vision и учёт расходов."
         )
         return f"{base}\n\n{standards}" if standards else base
 

@@ -162,6 +162,24 @@ async def _notification_loop(bot: Bot, rt: AssistantRuntime) -> None:
         await asyncio.sleep(3.0)
 
 
+def _unique_path(directory: Path, file_name: str) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    clean_name = Path(file_name).name
+    candidate = directory / clean_name
+    if not candidate.exists():
+        return candidate
+
+    stem = Path(clean_name).stem
+    suffix = Path(clean_name).suffix
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    candidate = directory / f"{stem}_{ts}{suffix}"
+    counter = 2
+    while candidate.exists():
+        candidate = directory / f"{stem}_{ts}_{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
 def build_dispatcher(
         rt: AssistantRuntime,
         run_chat: Callable[..., Awaitable[str]],
@@ -200,7 +218,8 @@ def build_dispatcher(
     ) -> None:
         uploads_dir = rt.workspace_dir / "uploads"
         uploads_dir.mkdir(parents=True, exist_ok=True)
-        target_path = uploads_dir / file_name
+        target_path = _unique_path(uploads_dir, file_name)
+        saved_name = target_path.name
 
         stop_event = asyncio.Event()
         typing_task = asyncio.create_task(_keep_typing(message.bot, message.chat.id, stop_event))
@@ -213,14 +232,14 @@ def build_dispatcher(
             caption = (message.caption or "").strip()
             if caption:
                 prompt = (
-                    f"[Пользователь прислал изображение, сохранено в uploads/{file_name}]\n"
+                    f"[Пользователь прислал изображение, сохранено в uploads/{saved_name}]\n"
                     f"Запрос пользователя: \"{caption}\"\n"
                     f"Инструкция: Внимательно изучи изображение (распознай текст, формулы, код или схему) "
                     f"и выполни именно то, что попросил пользователь."
                 )
             else:
                 prompt = (
-                    f"[Пользователь прислал изображение, сохранено в uploads/{file_name}]\n"
+                    f"[Пользователь прислал изображение, сохранено в uploads/{saved_name}]\n"
                     f"Распознай текст/содержимое на изображении. Если на фото задача, уравнение или код с ошибкой — "
                     f"реши или объясни; если документ/слайд — сделай чёткую расшифровку."
                 )
@@ -269,19 +288,22 @@ def build_dispatcher(
             await _process_image_message(message, doc.file_id, file_name)
             return
 
-        target_path = rt.workspace_dir / file_name
+        uploads_dir = rt.workspace_dir / "uploads"
+        target_path = _unique_path(uploads_dir, file_name)
+        saved_name = target_path.name
+        rel_path = f"uploads/{saved_name}"
 
         stop_event = asyncio.Event()
         typing_task = asyncio.create_task(_keep_typing(message.bot, message.chat.id, stop_event))
         try:
-            # 1. Скачиваем файл в workspace
+            # 1. Скачиваем файл в workspace/uploads
             await message.bot.download(doc.file_id, destination=target_path)
 
             caption = (message.caption or "").strip()
             if caption:
                 # Чёткий запрос пользователя: отвечаем СТРОГО на него
                 prompt = (
-                    f"Файл '{file_name}' сохранён в workspace.\n"
+                    f"Файл '{saved_name}' сохранён в workspace по пути '{rel_path}'.\n"
                     f"Запрос пользователя: \"{caption}\"\n"
                     f"Инструкция: Ответь строго и точно на поставленный вопрос по этому файлу, "
                     f"не делай лишних выжимок и пересказов, если об этом прямо не просили."
@@ -289,9 +311,9 @@ def build_dispatcher(
             else:
                 # Если файл отправлен без текста: просто смотрим инфо и ждём указаний
                 prompt = (
-                    f"Файл '{file_name}' успешно сохранён в workspace. "
-                    f"Посмотри базовую информацию (pdf_info) и просто подтверди получение: "
-                    f"назови количество страниц и спроси, какую задачу выполнить."
+                    f"Файл '{saved_name}' успешно сохранён в workspace по пути '{rel_path}'. "
+                    f"Посмотри базовую информацию (например, pdf_info для PDF) и просто подтверди получение: "
+                    f"укажи основные сведения и спроси, какую задачу выполнить."
                 )
 
             sid = get_session(message.chat.id)
